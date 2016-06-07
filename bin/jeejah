@@ -1,0 +1,26 @@
+#!/usr/bin/env lua
+
+require "luarocks.loader"
+
+local opts, host, port = {fg=true}
+
+for n,v in ipairs(arg) do
+   if(v == "--host") then
+      host = arg[n+1]
+   elseif(v == "--port") then
+      port = arg[n+1]
+   elseif(v == "--debug") then
+      opts.debug = true
+   elseif(v == "--version" or v == "--help") then
+      print("jeejah 0.1.0\n")
+      print("Options:")
+      print("  --host    Hostname on which to listen")
+      print("  --port    Port on which to listen")
+      print("  --debug   Print verbose debugging information")
+      os.exit(0)
+   end
+end
+
+local root_dir = debug.getinfo(1).source:sub(2, -(1+#"bin/jeejah"))
+local start = dofile(root_dir .. "jeejah.lua")
+start(host, port, opts)
