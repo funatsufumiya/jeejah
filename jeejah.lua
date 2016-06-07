@@ -43,24 +43,18 @@ local sandbox_for = function(write, provided_sandbox)
    return sandbox
 end
 
-local eval = function(write, sandbox, code)
-   -- TODO: redirect stdin
+-- for stuff that's shared between eval and load_file
+local execute_chunk = function(write, sandbox, chunk)
    local old_write, old_print = io.write, print
-   local chunk, err = loadstring("return " .. code, "*socket*")
-   if(err and not chunk) then -- statement, not expression
-      chunk, err = loadstring(code, "*socket*")
-      if(not chunk) then
-         return false, "Compilation error: " .. (err or "unknown error")
-      end
-   end
    if(sandbox) then
       setfenv(chunk, sandbox)
    else
+      -- TODO: redirect stdin
       _G.print = print_for(write)
       _G.io.write = write
    end
 
-   local trace
+   local trace, err
    local result = pack(xpcall(chunk, function(e)
                                  trace = debug.traceback()
                                  err = e end))
@@ -79,6 +73,25 @@ local eval = function(write, sandbox, code)
    else
       return false, (err or "Unknown error") .. "\n" .. trace
    end
+end
+
+local eval = function(write, sandbox, code)
+   local chunk, err = loadstring("return " .. code, "*socket*")
+   if(err and not chunk) then -- statement, not expression
+      chunk, err = loadstring(code, "*socket*")
+      if(not chunk) then
+         return false, "Compilation error: " .. (err or "unknown")
+      end
+   end
+   return execute_chunk(write, sandbox, chunk)
+end
+
+local load_file = function(write, sandbox, file)
+   local chunk, err = loadfile(file)
+   if(not chunk) then
+      return false, "Compilation error in " .. file ": ".. (err or "unknown")
+   end
+   return execute_chunk(write, sandbox, chunk)
 end
 
 -- TODO: proper session support?
@@ -101,15 +114,14 @@ local handle = function(conn, handlers, provided_sandbox, msg)
       d("Got", value, err)
       send(conn, response_for(msg, {value=value, ex=err}))
       send(conn, response_for(msg, {status="done"}))
-   elseif(msg.op == "load-file" and not provided_sandbox) then
-      -- TODO: sandbox this
+   elseif(msg.op == "load-file") then
       d("Loading file", msg.file)
-      local ok, res = pcall(function() dofile(msg.file, msg["file-name"]) end)
-      if(ok) then
-         send(conn, response_for(msg, {status="done", value=res}))
-      else
-         send(conn, response_for(msg, {status="done", ex=res}))
-      end
+      local write = write_for(conn, msg)
+      local sandbox = provided_sandbox and sandbox_for(write, provided_sandbox)
+      local value, err = load_file(write, sandbox, msg.file)
+      d("Got", value, err)
+      send(conn, response_for(msg, {value=value, ex=err}))
+      send(conn, response_for(msg, {status="done"}))
    elseif(msg.op == "stdin") then
       d("Stdin", serpent.block(msg))
       return -- TODO: implement

@@ -2,6 +2,8 @@
 
 An nREPL server for Lua.
 
+Note that multiple sessions and stdin are not yet supported.
+
 ## Installation
 
     $ luarocks install --local jeejah
