@@ -37,6 +37,9 @@ jeejah(host, port, {debug=true, fg=true, sandbox={x=12}})
 If you don't set `fg=true` then you will get back a coroutine which
 you'll need to repeatedly resume in order to handle requests.
 
+Note that the sandbox feature is not well-tested and should not be
+trusted to provide security.
+
 You can also pass in a `handlers` table where the keys are custom
 [nREPL ops](https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md)
 you want to handle yourself.
