@@ -7,6 +7,7 @@ local timeout = 0.1
 
 local pack = function(...) return {...} end
 local d = function(_) end
+local p = function(x) print(serpent.block(x)) end
 local sessions = {}
 
 local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
@@ -110,7 +111,7 @@ local complete = function(msg, sandbox)
       top_ctx[k] = require(v:sub(2,-2))
    end
 
-   local function cpl_for(input_parts, ctx, prefixes)
+   local function cpl_for(input_parts, ctx)
       if type(ctx) ~= "table" then return {} end
       if #input_parts == 0 and ctx ~= top_ctx then
          return ctx
@@ -118,23 +119,20 @@ local complete = function(msg, sandbox)
          local matches = {}
          for k in pairs(ctx) do
             if k:find('^' .. input_parts[1]) then
-               local parts = clone(prefixes)
-               table.insert(parts, k)
-               table.insert(matches, table.concat(parts, '.'))
+               table.insert(matches, k)
             end
          end
          return matches
       else
          local token1 = table.remove(input_parts, 1)
-         table.insert(prefixes, first_part)
-         return cpl_for(input_parts, ctx[token1], prefixes)
+         return cpl_for(input_parts, ctx[token1])
       end
    end
    local input_parts = {}
    for i in string.gmatch(msg.input, "([^.%s]+)") do
       table.insert(input_parts, i)
    end
-   return response_for(msg, {completions = cpl_for(input_parts, top_ctx, {})})
+   return response_for(msg, {completions = cpl_for(input_parts, top_ctx)})
 end
 
 -- see https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md
@@ -160,6 +158,7 @@ local handle = function(conn, handlers, provided_sandbox, msg)
       send(conn, response_for(msg, {status="done"}))
    elseif(msg.op == "complete") then
       d("Complete", msg.input)
+      local sandbox = provided_sandbox and sandbox_for(nil, provided_sandbox)
       send(conn, complete(msg, sandbox))
    elseif(msg.op == "stdin") then
       d("Stdin", serpent.block(msg))
