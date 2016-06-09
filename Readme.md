@@ -41,6 +41,12 @@ You can also pass in a `handlers` table where the keys are custom
 [nREPL ops](https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md)
 you want to handle yourself.
 
+## Completion
+
+The included `monroe-lua-complete.el` file handles completion by
+querying the connected nREPL server for possibilities. Simply invoke
+`completion-at-point` (bound to `C-M-i` by default) when connected.
+
 ## License
 
 Copyright © 2016 Phil Hagelberg and contributors

@@ -101,6 +101,42 @@ local register_session = function(msg)
    return response_for(msg, {["new-session"]=session, status="done"})
 end
 
+local complete = function(msg, sandbox)
+   local clone = function(t)
+      local n = {} for k,v in pairs(t) do n[k] = v end return n
+   end
+   local top_ctx = clone(sandbox or _G)
+   for k,v in pairs(msg.libs or {}) do
+      top_ctx[k] = require(v:sub(2,-2))
+   end
+
+   local function cpl_for(input_parts, ctx, prefixes)
+      if type(ctx) ~= "table" then return {} end
+      if #input_parts == 0 and ctx ~= top_ctx then
+         return ctx
+      elseif #input_parts == 1 then
+         local matches = {}
+         for k in pairs(ctx) do
+            if k:find('^' .. input_parts[1]) then
+               local parts = clone(prefixes)
+               table.insert(parts, k)
+               table.insert(matches, table.concat(parts, '.'))
+            end
+         end
+         return matches
+      else
+         local token1 = table.remove(input_parts, 1)
+         table.insert(prefixes, first_part)
+         return cpl_for(input_parts, ctx[token1], prefixes)
+      end
+   end
+   local input_parts = {}
+   for i in string.gmatch(msg.input, "([^.%s]+)") do
+      table.insert(input_parts, i)
+   end
+   return response_for(msg, {completions = cpl_for(input_parts, top_ctx, {})})
+end
+
 -- see https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md
 local handle = function(conn, handlers, provided_sandbox, msg)
    if(msg.op == "clone") then
@@ -122,6 +158,9 @@ local handle = function(conn, handlers, provided_sandbox, msg)
       d("Got", value, err)
       send(conn, response_for(msg, {value=value, ex=err}))
       send(conn, response_for(msg, {status="done"}))
+   elseif(msg.op == "complete") then
+      d("Complete", msg.input)
+      send(conn, complete(msg, sandbox))
    elseif(msg.op == "stdin") then
       d("Stdin", serpent.block(msg))
       return -- TODO: implement
