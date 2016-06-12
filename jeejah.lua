@@ -2,7 +2,7 @@ local socket = require "socket"
 local serpent = require "serpent"
 local bencode = require "bencode"
 
-local timeout = 0.1
+local timeout = 0.001
 
 local pack = function(...) return {...} end
 local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
@@ -180,13 +180,13 @@ local handle = function(conn, handlers, sandbox, msg)
    end
 end
 
-local function receive(conn, yield, partial)
+local function receive(conn, partial)
    local s, err = conn:receive(1) -- wow this is primitive
-   yield()
+   coroutine.yield()
    if(s) then
-      return receive(conn, yield, (partial or "") .. s)
+      return receive(conn, (partial or "") .. s)
    elseif(err == "timeout" and partial == nil) then
-      return receive(conn, yield)
+      return receive(conn)
    elseif(err == "timeout") then
       return partial
    else
@@ -194,33 +194,38 @@ local function receive(conn, yield, partial)
    end
 end
 
-local function loop(server, sandbox, handlers, yield)
+local function handle_loop(conn, sandbox, handlers)
+   local input, r_err = receive(conn)
+   if(input) then
+      local decoded, d_err = bencode.decode(input)
+      coroutine.yield()
+      if(decoded) then
+         handle(conn, handlers, sandbox, decoded)
+      else
+         print("  | Decoding error:", d_err)
+      end
+      return handle_loop(conn, sandbox, handlers)
+   else
+      return r_err
+   end
+end
+
+local function loop(server, sandbox, handlers, connections)
    local conn, err = server:accept()
-   yield()
+   coroutine.yield()
    if(conn) then
       conn:settimeout(timeout)
       d("Connected.")
-      while true do
-         local input, r_err = receive(conn, yield)
-         if(input) then
-            local decoded, d_err = bencode.decode(input)
-            yield()
-            if(decoded) then
-               handle(conn, handlers, sandbox, decoded)
-            else
-               print("  | Decoding error:", d_err)
-            end
-         else
-            if(r_err == "closed") then
-               return loop(server, sandbox, handlers, yield)
-            elseif(r_err ~= "timeout") then
-               print("  | Error:", r_err)
-            end
-         end
-      end
+      local coro = coroutine.create(function()
+            local h_err = handle_loop(conn, sandbox, handlers, yield)
+            d("Connection closed: " .. h_err)
+      end)
+      table.insert(connections, coro)
+      return loop(server, sandbox, handlers, connections)
    else
       if(err ~= "timeout") then print("  | Socket error: " .. err) end
-      return loop(server, sandbox, handlers, yield)
+      for _,c in ipairs(connections) do coroutine.resume(c) end
+      return loop(server, sandbox, handlers, connections)
    end
 end
 
@@ -237,15 +242,11 @@ return function(host, port, opts)
    if(opts.timeout) then timeout = tonumber(opts.timeout) end
 
    if(server) then
-      server:settimeout(timeout)
+      server:settimeout(0.000001)
       print("Server started on " .. host .. ":" .. port .. "...")
-      if(opts.fg) then
-         return loop(server, opts.sandbox, opts.handlers, function() end)
-      else
-         return coroutine.create(function()
-               loop(server, opts.sandbox, opts.handlers, coroutine.yield)
-         end)
-      end
+      return coroutine.create(function()
+            loop(server, opts.sandbox, opts.handlers, {})
+      end)
    else
       print("  | Error starting socket repl server: " .. err)
    end

@@ -2,7 +2,7 @@
 
 An nREPL server for Lua.
 
-Note that multiple sessions and stdin are not yet supported.
+Note that stdin is not currently implemented.
 
 ## Installation
 
@@ -31,11 +31,14 @@ You can use it as a library too, of course:
 
 ```lua
 local jeejah = require("jeejah")
-jeejah(host, port, {debug=true, fg=true, sandbox={x=12}})
+local coro = jeejah(host, port, {debug=true, sandbox={x=12}})
+while true do coroutine.resume(coro) end
 ```
 
-If you don't set `fg=true` then you will get back a coroutine which
-you'll need to repeatedly resume in order to handle requests.
+The function returns a coroutine which you'll need to repeatedly
+resume in order to handle requests. Each accepted connection is stored
+in a coroutine internal to that function; these are each repeatedly
+resumed by the main coroutine.
 
 Note that the sandbox feature is not well-tested and should not be
 trusted to provide security.
