@@ -11,6 +11,8 @@ for n,v in ipairs(arg) do
       port = arg[n+1]
    elseif(v == "--debug") then
       opts.debug = true
+   elseif(v == "--empty-sandbox") then
+      opts.sandbox = {}
    elseif(v == "--version" or v == "--help") then
       print("jeejah 0.1.0\n")
       print("Options:")

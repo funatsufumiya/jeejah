@@ -7,7 +7,7 @@ local timeout = 0.1
 local pack = function(...) return {...} end
 local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
 local d = function(_) end
-local p = function(x) print(serpent.block(x), serpent_opts) end
+local p = function(x) print(serpent.block(x, serpent_opts)) end
 local sessions = {}
 
 local response_for = function(old_msg, msg)
@@ -102,8 +102,10 @@ local register_session = function(conn, msg, provided_sandbox)
    return response_for(msg, {["new-session"]=session, status="done"})
 end
 
-local session_for = function(conn, msg, provided_sandbox)
-   return sessions[msg.session] or register_session(conn, msg, provided_sandbox)
+local session_for = function(conn, msg, sandbox)
+   local s = sessions[msg.session] or register_session(conn, msg, sandbox)
+   s.write = write_for(conn, msg)
+   return s
 end
 
 local complete = function(msg, sandbox)
