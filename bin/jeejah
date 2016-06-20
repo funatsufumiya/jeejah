@@ -14,7 +14,7 @@ for n,v in ipairs(arg) do
    elseif(v == "--empty-sandbox") then
       opts.sandbox = {}
    elseif(v == "--version" or v == "--help") then
-      print("jeejah 0.1.0\n")
+      print("jeejah 0.2.0\n")
       print("Options:")
       print("  --host    Hostname on which to listen")
       print("  --port    Port on which to listen")
