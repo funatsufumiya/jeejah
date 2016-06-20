@@ -164,16 +164,10 @@ local handle = function(conn, handlers, sandbox, msg)
    elseif(msg.op == "stdin") then
       d("Stdin", serpent.block(msg))
       return -- TODO: implement
-   elseif(msg.op == "interrupt") then
-      d("Interrupt")
-      return -- we can't do anything to interrupt, ignore silently
-   elseif(msg.op == "describe") then
-      d("Describe")
-      write_for(conn, msg)("Describe is not supported.\n")
    elseif(handlers[msg.op]) then
       d("Custom op:", msg.op)
       handlers[msg.op](conn, msg, session_for(conn, msg, sandbox))
-   else
+   elseif(msg.op ~= "interrupt") then -- silently ignore interrupt
       send(conn, response_for(msg, {status="unknown-op"}))
       print("  | Unknown op", serpent.block(msg))
    end
@@ -213,7 +207,7 @@ local connections = {}
 
 local function loop(server, sandbox, handlers)
    local conn, err = server:accept()
-   coroutine.yield()
+   local stop = coroutine.yield() == "stop"
    if(conn) then
       conn:settimeout(timeout)
       d("Connected.")
@@ -226,7 +220,12 @@ local function loop(server, sandbox, handlers)
    else
       if(err ~= "timeout") then print("  | Socket error: " .. err) end
       for _,c in ipairs(connections) do coroutine.resume(c) end
-      return loop(server, sandbox, handlers)
+      if(stop or err == "closed") then
+         server:close()
+         print("Server stopped.")
+      else
+         return loop(server, sandbox, handlers)
+      end
    end
 end
 
@@ -254,8 +253,12 @@ return {
       end
    end,
 
+   stop = function(coro)
+      coroutine.resume(coro, "stop")
+   end,
+
    broadcast = function(msg)
-      for _,session in ipairs(sessions) do
+      for _,session in pairs(sessions) do
          send(session.conn, msg)
       end
    end,
