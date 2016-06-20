@@ -33,6 +33,19 @@ local print_for = function(write)
    end
 end
 
+local read_for = function(conn, msg)
+   return function()
+      send(conn, response_for(msg, {status={"need-input"}}))
+      while(not sessions[msg.session].input) do
+         coroutine.yield()
+         d("yielded")
+      end
+      local input = sessions[msg.session].input
+      sessions[msg.session].input = nil
+      return input
+   end
+end
+
 local sandbox_for = function(write, provided_sandbox)
    local sandbox = { io = { write = write },
                      print = print_for(write), }
@@ -44,23 +57,20 @@ end
 
 -- for stuff that's shared between eval and load_file
 local execute_chunk = function(session, chunk)
-   local old_write, old_print = io.write, print
+   local old_write, old_print, old_read = io.write, print, io.read
    if(session.sandbox) then
-      old_write = (session.sandbox.io or {}).write or io.write
-      old_print = session.sandbox.print or print
       setfenv(chunk, session.sandbox)
    else
-      -- TODO: redirect stdin
       _G.print = print_for(session.write)
-      _G.io.write = session.write
+      _G.io.write, _G.io.read = session.write, session.read
    end
 
    local trace, err
    local result = pack(xpcall(chunk, function(e)
                                  trace = debug.traceback()
                                  err = e end))
-   _G.print = old_print
-   _G.io.write = old_write
+
+   _G.print, _G.io.write, _G.io.read = old_print, old_write, old_read
 
    if(result[1]) then
       local res, i = serpent.block(result[2], serpent_opts), 3
@@ -97,13 +107,15 @@ local register_session = function(conn, msg, provided_sandbox)
    local session = tostring(math.random(999999999))
    local write = write_for(conn, msg)
    local sandbox = provided_sandbox and sandbox_for(write, provided_sandbox)
-   sessions[session] = { conn = conn, write = write, sandbox = sandbox }
+   sessions[session] = { conn = conn, write = write,
+                         sandbox = sandbox, coros = {}}
    return response_for(msg, {["new-session"]=session, status="done"})
 end
 
 local session_for = function(conn, msg, sandbox)
    local s = sessions[msg.session] or register_session(conn, msg, sandbox)
    s.write = write_for(conn, msg)
+   s.read = read_for(conn, msg)
    return s
 end
 
@@ -163,7 +175,9 @@ local handle = function(conn, handlers, sandbox, msg)
       send(conn, complete(msg, session_sandbox))
    elseif(msg.op == "stdin") then
       d("Stdin", serpent.block(msg))
-      return -- TODO: implement
+      sessions[msg.session].input = msg.stdin
+      send(conn, response_for(msg, {status="done"}))
+      return
    elseif(handlers[msg.op]) then
       d("Custom op:", msg.op)
       handlers[msg.op](conn, msg, session_for(conn, msg, sandbox))
@@ -173,9 +187,19 @@ local handle = function(conn, handlers, sandbox, msg)
    end
 end
 
+local handler_coros = {}
+
 local function receive(conn, partial)
    local s, err = conn:receive(1) -- wow this is primitive
    coroutine.yield()
+   -- iterate backwards so we can safely remove
+   for i=#handler_coros, 1, -1 do
+      coroutine.resume(handler_coros[i])
+      if(coroutine.status(handler_coros[i]) ~= "suspended") then
+         table.remove(handler_coros, i)
+      end
+   end
+
    if(s) then
       return receive(conn, (partial or "") .. s)
    elseif(err == "timeout" and partial == nil) then
@@ -193,7 +217,14 @@ local function handle_loop(conn, sandbox, handlers)
       local decoded, d_err = bencode.decode(input)
       coroutine.yield()
       if(decoded) then
-         handle(conn, handlers, sandbox, decoded)
+         -- If we don't spin up a coroutine here, we can't io.read, because
+         -- that requires waiting for a response from the client. But most
+         -- messages don't need to stick around.
+         local coro = coroutine.create(handle)
+         coroutine.resume(coro, conn, handlers, sandbox, decoded)
+         if(coroutine.status(coro) == "suspended") then
+            table.insert(handler_coros, coro)
+         end
       else
          print("  | Decoding error:", d_err)
       end

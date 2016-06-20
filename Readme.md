@@ -65,14 +65,18 @@ You can also pass in a `handlers` table where the keys are custom
 [nREPL ops](https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md)
 you want to handle yourself.
 
-Note that stdin is not currently implemented.
-
 ## Completion
 
 The included `monroe-lua-complete.el` file adds support for completion
 to the Monroe client by querying the connected nREPL server for
 possibilities. Simply invoke `completion-at-point` (bound to `C-M-i`
 by default) when connected.
+
+## Caveats
+
+Lua 5.1 does not allow yielding coroutines from inside protected
+calls, which means you cannot use `io.read`, though LuaJIT and
+Lua 5.2+ allow it.
 
 ## License
 
