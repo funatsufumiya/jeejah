@@ -24,6 +24,6 @@ for n,v in ipairs(arg) do
 end
 
 local root_dir = debug.getinfo(1).source:sub(2, -(1+#"bin/jeejah"))
-local start = dofile(root_dir .. "jeejah.lua")
-local coro = start(host, port, opts)
+local jeejah = dofile(root_dir .. "jeejah.lua")
+local coro = jeejah.start(host, port, opts)
 while true do coroutine.resume(coro) end
