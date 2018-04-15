@@ -2,6 +2,8 @@ local socket = require "socket"
 local serpent = require "serpent"
 local bencode = require "bencode"
 
+local load    = loadstring or load
+
 local timeout = 0.001
 
 local pack = function(...) return {...} end
@@ -85,9 +87,9 @@ local execute_chunk = function(session, chunk)
 end
 
 local eval = function(session, code)
-   local chunk, err = loadstring("return " .. code, "*socket*")
+   local chunk, err = load("return " .. code, "*socket*")
    if(err and not chunk) then -- statement, not expression
-      chunk, err = loadstring(code, "*socket*")
+      chunk, err = load(code, "*socket*")
       if(not chunk) then
          return nil, "Compilation error: " .. (err or "unknown")
       end
