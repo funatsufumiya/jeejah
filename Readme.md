@@ -4,7 +4,7 @@ An nREPL server for Lua.
 
 ## A what now?
 
-The [nREPL protocol](https://github.com/clojure/tools.nrepl/#why-nrepl)
+The [nREPL protocol](https://nrepl.org/nrepl/index.html#_why_nrepl)
 allows developers to embed a server in their programs to which
 external programs can connect for development, debugging, etc.
 
@@ -62,7 +62,7 @@ Note that the sandbox feature is not well-tested or audited and should
 not be trusted to provide robust security.
 
 You can also pass in a `handlers` table where the keys are custom
-[nREPL ops](https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md)
+[nREPL ops](https://nrepl.org/nrepl/ops.html)
 you want to handle yourself.
 
 ## Completion
