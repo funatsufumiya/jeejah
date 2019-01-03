@@ -1,6 +1,6 @@
 # JeeJah
 
-An nREPL server for Lua.
+An nREPL server for Fennel and Lua.
 
 ## A what now?
 
@@ -21,13 +21,13 @@ programming game. See the file `data/upgrades.lua`.
 Currently only tested with [monroe](https://github.com/sanel/monroe/)
 as a client, which runs in Emacs. Other clients exist for Vim,
 Eclipse, and Atom, as well as several independent command-line
-clients; however these may require some adaptation to work with Lua.
+clients; however these may require some adaptation to work with Jeejah.
 
 ## Installation
 
-The pure-Lua dependencies are included (`bencode` and `serpent`) but
-you will need to install `luasocket` yourself. If your operating
-system does not provide it, you can install it using LuaRocks:
+The pure-Lua dependencies are included (`bencode`, `serpent`, and
+`fennel`) but you will need to install `luasocket` yourself. If your
+operating system does not provide it, you can install it using LuaRocks:
 
     $ luarocks install --local luasocket
 
@@ -37,9 +37,10 @@ You can symlink `bin/jeejah` to your `$PATH` or something.
 
 You can launch a standalone nREPL server:
 
-    $ jeejah
+    $ bin/jeejah
 
-Accepts `--host` and `--port` args. Also accepts `--debug` flag.
+Pass in a `--fennel` flag to start a server for evaluating Fennel
+code. Accepts `--host` and `--port` args. Also accepts `--debug` flag.
 
 You can use it as a library too, of course:
 
