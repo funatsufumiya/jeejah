@@ -111,7 +111,7 @@ local register_session = function(conn, msg, provided_sandbox)
    local sandbox = provided_sandbox and sandbox_for(write, provided_sandbox)
    sessions[session] = { conn = conn, write = write,
                          sandbox = sandbox, coros = {}}
-   return response_for(msg, {["new-session"]=session, status="done"})
+   return response_for(msg, {["new-session"]=session, status={"done"}})
 end
 
 local session_for = function(conn, msg, sandbox)
@@ -167,13 +167,13 @@ local handle = function(conn, handlers, sandbox, msg)
       local value, err = eval(session_for(conn, msg, sandbox), msg.code)
       d("Got", value, err)
       send(conn, response_for(msg, {value=value, ex=err}))
-      send(conn, response_for(msg, {status="done"}))
+      send(conn, response_for(msg, {status={"done"}}))
    elseif(msg.op == "load-file") then
       d("Loading file", msg.file)
       local value, err = load_file(session_for(conn, msg, sandbox), msg.file)
       d("Got", value, err)
       send(conn, response_for(msg, {value=value, ex=err}))
-      send(conn, response_for(msg, {status="done"}))
+      send(conn, response_for(msg, {status={"done"}}))
    elseif(msg.op == "complete") then
       d("Complete", msg.input)
       local session_sandbox = session_for(conn, msg, sandbox).sandbox
@@ -181,10 +181,10 @@ local handle = function(conn, handlers, sandbox, msg)
    elseif(msg.op == "stdin") then
       d("Stdin", serpent.block(msg))
       sessions[msg.session].input = msg.stdin
-      send(conn, response_for(msg, {status="done"}))
+      send(conn, response_for(msg, {status={"done"}}))
       return
    elseif(msg.op ~= "interrupt") then -- silently ignore interrupt
-      send(conn, response_for(msg, {status="unknown-op"}))
+      send(conn, response_for(msg, {status={"unknown-op"}}))
       print("  | Unknown op", serpent.block(msg))
    end
 end

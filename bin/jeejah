@@ -51,12 +51,12 @@ for n,v in ipairs(arg) do
          ["load-file"] = function(conn, msg, session)
             local value, err = call(fennel.dofile, msg.file, session)
             conn:send(bencode.encode(response_for(msg, {value=value, ex=err})))
-            conn:send(bencode.encode(response_for(msg, {status="done"})))
+            conn:send(bencode.encode(response_for(msg, {status={"done"}})))
          end,
          eval = function(conn, msg, session)
             local value, err = call(fennel.eval, msg.code, session)
             conn:send(bencode.encode(response_for(msg, {value=value, ex=err})))
-            conn:send(bencode.encode(response_for(msg, {status="done"})))
+            conn:send(bencode.encode(response_for(msg, {status={"done"}})))
          end,
       }
    elseif(v == "--debug") then
