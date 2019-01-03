@@ -156,7 +156,10 @@ end
 
 -- see https://github.com/clojure/tools.nrepl/blob/master/doc/ops.md
 local handle = function(conn, handlers, sandbox, msg)
-   if(msg.op == "clone") then
+   if(handlers and handlers[msg.op]) then
+      d("Custom op:", msg.op)
+      handlers[msg.op](conn, msg, session_for(conn, msg, sandbox))
+   elseif(msg.op == "clone") then
       d("New session.")
       send(conn, register_session(conn, msg, sandbox))
    elseif(msg.op == "eval") then
@@ -180,9 +183,6 @@ local handle = function(conn, handlers, sandbox, msg)
       sessions[msg.session].input = msg.stdin
       send(conn, response_for(msg, {status="done"}))
       return
-   elseif(handlers[msg.op]) then
-      d("Custom op:", msg.op)
-      handlers[msg.op](conn, msg, session_for(conn, msg, sandbox))
    elseif(msg.op ~= "interrupt") then -- silently ignore interrupt
       send(conn, response_for(msg, {status="unknown-op"}))
       print("  | Unknown op", serpent.block(msg))
