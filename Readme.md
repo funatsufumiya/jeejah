@@ -25,15 +25,11 @@ clients; however these may require some adaptation to work with Lua.
 
 ## Installation
 
-    $ luarocks install --local jeejah
-
-Make sure `~/.luarocks/bin` is on your `$PATH`.
-
-Or from source:
+The pure-Lua dependencies are included (`bencode` and `serpent`) but
+you will need to install `luasocket` yourself. If your operating
+system does not provide it, you can install it using LuaRocks:
 
     $ luarocks install --local luasocket
-    $ luarocks install --local serpent
-    $ luarocks install --local bencode
 
 You can symlink `bin/jeejah` to your `$PATH` or something.
 
@@ -80,6 +76,6 @@ Lua 5.2+ allow it.
 
 ## License
 
-Copyright © 2016 Phil Hagelberg and contributors
+Copyright © 2016-2018 Phil Hagelberg and contributors
 
 Distributed under the MIT license; see file LICENSE
