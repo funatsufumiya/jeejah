@@ -182,7 +182,9 @@ local handle = function(conn, handlers, sandbox, msg)
       d("Evaluating", msg.code)
       local value, err = eval(session_for(conn, msg, sandbox), msg.code, msg.pp)
       d("Got", value, err)
-      send(conn, response_for(msg, {value=value, ex=err, status={"done"}}))
+      -- monroe has a bug that requires status=done to be a separate message
+      send(conn, response_for(msg, {value=value, ex=err}))
+      send(conn, response_for(msg, {status={"done"}}))
    elseif(msg.op == "load-file") then
       d("Loading file", msg.file)
       local value, err = load_file(session_for(conn, msg, sandbox),
@@ -307,7 +309,7 @@ return {
 
       if(server) then
          server:settimeout(0.000001)
-         print("Server started on port" .. port .. "...")
+         print("Server started on port " .. port .. "...")
          return coroutine.create(function()
                loop(server, opts.sandbox, opts.handlers, opts.middleware)
          end)
