@@ -10,55 +10,21 @@ for n,v in ipairs(arg) do
    elseif(v == "--port") then
       port = arg[n+1]
    elseif(v == "--fennel") then
-      local bencode = require("bencode")
       local fennel = require("fennel")
       table.insert(package.loaders, fennel.make_searcher({correlate=true}))
       local view = require("fennelview")
-
-      -- TODO: a lot of this is duplicated from functions in jeejah.lua
-      local call = function(f, argument, session)
-         local old_write, old_print, old_read = io.write, print, io.read
-         if(session.sandbox) then
-            return f(argument, {env=session.sandbox})
-         else
-            _G.print = function(...)
-               for _,x in ipairs({...}) do session.write(x) end
-               session.write("\n")
-            end
-            _G.io.write, _G.io.read = session.write, session.read
+      opts.middleware = function(f, msg)
+         if(msg.op == "load-file") then
+            local f = assert(io.open(msg.filename, "rb"))
+            msg.op, msg.code = "eval", f:read("*all"):gsub("^#![^\n]*\n", "")
+            f:close()
          end
-
-         local trace, err
-         local results = {xpcall(function() return f(argument) end,
-                                function(e)
-                                   trace = debug.traceback()
-                                   err = e end)}
-         _G.print, _G.io.write, _G.io.read = old_print, old_write, old_read
-         if(table.remove(results, 1)) then
-            local out = {}
-            for i, res in ipairs(results) do out[i] = view(res) end
-            return table.concat(out, "\t")
-         else
-            return nil, (err or "Unknown error") .. "\n" .. trace
+         if(msg.op == "eval") then
+            msg.pp = view
+            msg.code = fennel.compileString(msg.code)
          end
+         return f(msg)
       end
-      local response_for = function(old_msg, msg)
-         msg.session, msg.id, msg.ns = old_msg.session, old_msg.id, ""
-         return msg
-      end
-
-      opts.handlers = {
-         ["load-file"] = function(conn, msg, session)
-            local value, err = call(fennel.dofile, msg.file, session)
-            conn:send(bencode.encode(response_for(msg, {value=value, ex=err})))
-            conn:send(bencode.encode(response_for(msg, {status={"done"}})))
-         end,
-         eval = function(conn, msg, session)
-            local value, err = call(fennel.eval, msg.code, session)
-            conn:send(bencode.encode(response_for(msg, {value=value, ex=err})))
-            conn:send(bencode.encode(response_for(msg, {status={"done"}})))
-         end,
-      }
    elseif(v == "--debug") then
       opts.debug = true
    elseif(v == "--empty-sandbox") then

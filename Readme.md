@@ -9,7 +9,7 @@ allows developers to embed a server in their programs to which
 external programs can connect for development, debugging, etc.
 
 The original implementation of the protocol was written in Clojure,
-and most clients assume they will connect to a Clojure server; however
+and many clients assume they will connect to a Clojure server; however
 the protocol is quite agnostic about what language is being
 evaluated. It supports evaluating snippets of code or whole files with
 `print` and `io.write` redirected back to the connected client.
@@ -18,10 +18,16 @@ This library was originally written to add Emacs support to
 [Bussard](https://gitlab.com/technomancy/bussard), a spaceflight
 programming game. See the file `data/upgrades.lua`.
 
-Currently only tested with [monroe](https://github.com/sanel/monroe/)
-as a client, which runs in Emacs. Other clients exist for Vim,
-Eclipse, and Atom, as well as several independent command-line
-clients; however these may require some adaptation to work with Jeejah.
+Currently mainly tested with
+[monroe](https://github.com/sanel/monroe/) and
+[shevek](https://git.sr.ht/~technomancy/shevek/) as
+clients. [grenchman](https://leiningen.org/grench.html) version 0.3.0+
+works. Other clients exist for Vim, Eclipse, and Atom, as well as
+several independent command-line clients; however these may require
+some adaptation to work with Jeejah. If you try your favorite client
+and find that it makes Clojure-specific assumptions, please report a
+bug with it so that it can gracefully degrade when those assumptions
+don't hold.
 
 ## Installation
 
