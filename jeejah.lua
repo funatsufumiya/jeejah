@@ -114,6 +114,18 @@ local register_session = function(conn, msg, provided_sandbox)
    return response_for(msg, {["new-session"]=session, status={"done"}})
 end
 
+local unregister_session = function(msg)
+   sessions[msg.session] = nil
+   return response_for(msg, {status={"done"}})
+end
+
+local describe = function(msg, handlers)
+   local ops = { "clone", "close", "describe", "eval", "load-file",
+                 "ls-sessions", "complete", "stdin", "interrupt" }
+   for op in handlers do table.insert(ops, op) end
+   return response_for(msg, {ops=ops, status={"done"}})
+end
+
 local session_for = function(conn, msg, sandbox)
    local s = sessions[msg.session] or register_session(conn, msg, sandbox)
    s.write = write_for(conn, msg)
@@ -162,6 +174,9 @@ local handle = function(conn, handlers, sandbox, msg)
    elseif(msg.op == "clone") then
       d("New session.")
       send(conn, register_session(conn, msg, sandbox))
+   elseif(msg.op == "describe") then
+      d("Describe.")
+      send(conn, describe(msg, handlers))
    elseif(msg.op == "eval") then
       d("Evaluating", msg.code)
       local value, err = eval(session_for(conn, msg, sandbox), msg.code)
@@ -172,8 +187,12 @@ local handle = function(conn, handlers, sandbox, msg)
       d("Loading file", msg.file)
       local value, err = load_file(session_for(conn, msg, sandbox), msg.file)
       d("Got", value, err)
-      send(conn, response_for(msg, {value=value, ex=err}))
-      send(conn, response_for(msg, {status={"done"}}))
+      send(conn, response_for(msg, {value=value, ex=err, status={"done"}}))
+   elseif(msg.op == "ls-sessions") then
+      d("List sessions")
+      local session_ids = {}
+      for id in pairs(sessions) do table.insert(session_ids, id) end
+      send(conn, response_for(msg, {sessions=session_ids, status={"done"}}))
    elseif(msg.op == "complete") then
       d("Complete", msg.input)
       local session_sandbox = session_for(conn, msg, sandbox).sandbox
