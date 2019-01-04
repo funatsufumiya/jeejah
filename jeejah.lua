@@ -9,7 +9,7 @@ local timeout = 0.001
 local pack = function(...) return {...} end
 local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
 local d = function(_) end
-local p = function(x) print(serpent.block(x, serpent_opts)) end
+local serpent_pp = function(x) print(serpent.block(x, serpent_opts)) end
 local sessions = {}
 
 local response_for = function(old_msg, msg)
@@ -58,8 +58,9 @@ local sandbox_for = function(write, provided_sandbox)
 end
 
 -- for stuff that's shared between eval and load_file
-local execute_chunk = function(session, chunk)
+local execute_chunk = function(session, chunk, pp)
    local old_write, old_print, old_read = io.write, print, io.read
+   pp = pp or serpent_pp
    if(session.sandbox) then
       setfenv(chunk, session.sandbox)
    else
@@ -75,9 +76,9 @@ local execute_chunk = function(session, chunk)
    _G.print, _G.io.write, _G.io.read = old_print, old_write, old_read
 
    if(result[1]) then
-      local res, i = serpent.block(result[2], serpent_opts), 3
+      local res, i = pp(result[2]), 3
       while i <= #result do
-         res = res .. ', ' .. serpent.block(result[i], serpent_opts)
+         res = res .. ', ' .. pp(result[i])
          i = i + 1
       end
       return res
@@ -86,7 +87,7 @@ local execute_chunk = function(session, chunk)
    end
 end
 
-local eval = function(session, code)
+local eval = function(session, code, pp)
    local chunk, err = load("return " .. code, "*socket*")
    if(err and not chunk) then -- statement, not expression
       chunk, err = load(code, "*socket*")
@@ -94,11 +95,11 @@ local eval = function(session, code)
          return nil, "Compilation error: " .. (err or "unknown")
       end
    end
-   return execute_chunk(session, chunk)
+   return execute_chunk(session, chunk, pp)
 end
 
-local load_file = function(session, file)
-   local chunk, err = loadfile(file)
+local load_file = function(session, file, loader)
+   local chunk, err = (loader or loadfile)(file)
    if(not chunk) then
       return nil, "Compilation error in " .. file ": ".. (err or "unknown")
    end
@@ -179,13 +180,13 @@ local handle = function(conn, handlers, sandbox, msg)
       send(conn, describe(msg, handlers))
    elseif(msg.op == "eval") then
       d("Evaluating", msg.code)
-      local value, err = eval(session_for(conn, msg, sandbox), msg.code)
+      local value, err = eval(session_for(conn, msg, sandbox), msg.code, msg.pp)
       d("Got", value, err)
-      send(conn, response_for(msg, {value=value, ex=err}))
-      send(conn, response_for(msg, {status={"done"}}))
+      send(conn, response_for(msg, {value=value, ex=err, status={"done"}}))
    elseif(msg.op == "load-file") then
       d("Loading file", msg.file)
-      local value, err = load_file(session_for(conn, msg, sandbox), msg.file)
+      local value, err = load_file(session_for(conn, msg, sandbox),
+                                   msg.file, msg.loader)
       d("Got", value, err)
       send(conn, response_for(msg, {value=value, ex=err, status={"done"}}))
    elseif(msg.op == "ls-sessions") then
@@ -232,24 +233,33 @@ local function receive(conn, partial)
    end
 end
 
-local function handle_loop(conn, sandbox, handlers)
+local function handle_loop(conn, sandbox, handlers, middleware)
    local input, r_err = receive(conn)
    if(input) then
       local decoded, d_err = bencode.decode(input)
       coroutine.yield()
-      if(decoded) then
+      if(decoded and decoded.op == "close") then
+         d("End session.")
+         return send(conn, unregister_session(decoded))
+      elseif(decoded and decoded.op ~= "close") then
          -- If we don't spin up a coroutine here, we can't io.read, because
          -- that requires waiting for a response from the client. But most
          -- messages don't need to stick around.
          local coro = coroutine.create(handle)
-         coroutine.resume(coro, conn, handlers, sandbox, decoded)
+         if(middleware) then
+            middleware(function(msg)
+                          coroutine.resume(coro, conn, handlers, sandbox, msg)
+                       end, decoded)
+         else
+            coroutine.resume(coro, conn, handlers, sandbox, decoded)
+         end
          if(coroutine.status(coro) == "suspended") then
             table.insert(handler_coros, coro)
          end
       else
          print("  | Decoding error:", d_err)
       end
-      return handle_loop(conn, sandbox, handlers)
+      return handle_loop(conn, sandbox, handlers, middleware)
    else
       return r_err
    end
@@ -257,18 +267,19 @@ end
 
 local connections = {}
 
-local function loop(server, sandbox, handlers)
+local function loop(server, sandbox, handlers, middleware)
    local conn, err = server:accept()
    local stop = coroutine.yield() == "stop"
    if(conn) then
       conn:settimeout(timeout)
       d("Connected.")
       local coro = coroutine.create(function()
-            local h_err = handle_loop(conn, sandbox, handlers, yield)
+            -- local h_err = handle_loop(conn, sandbox, handlers, middleware)
+            local ok, h_err = pcall(handle_loop, conn, sandbox, handlers, middleware)
             d("Connection closed: " .. h_err)
       end)
       table.insert(connections, coro)
-      return loop(server, sandbox, handlers)
+      return loop(server, sandbox, handlers, middleware)
    else
       if(err ~= "timeout") then print("  | Socket error: " .. err) end
       for _,c in ipairs(connections) do coroutine.resume(c) end
@@ -276,7 +287,7 @@ local function loop(server, sandbox, handlers)
          server:close()
          print("Server stopped.")
       else
-         return loop(server, sandbox, handlers)
+         return loop(server, sandbox, handlers, middleware)
       end
    end
 end
@@ -298,7 +309,7 @@ return {
          server:settimeout(0.000001)
          print("Server started on " .. host .. ":" .. port .. "...")
          return coroutine.create(function()
-               loop(server, opts.sandbox, opts.handlers, {})
+               loop(server, opts.sandbox, opts.handlers, opts.middleware)
          end)
       else
          print("  | Error starting socket repl server: " .. err)
