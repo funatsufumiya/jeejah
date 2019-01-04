@@ -292,22 +292,22 @@ local function loop(server, sandbox, handlers, middleware)
    end
 end
 
--- Start an nrepl socket server on the given host and port. For opts
+-- Start an nrepl socket server on the given port. For opts
 -- you can pass a table with fg=true to run in the foreground, debug=true for
 -- verbose logging, and sandbox={...} to evaluate all code in a sandbox.
 -- You can also give an opts.handlers table keying ops to handler functions
 -- which take the socket, the decoded message, and the optional sandbox table.
 return {
-   start = function(host, port, opts)
-      host, port = host or "localhost", port or 7888
-      local server, err = assert(socket.bind(host, port))
+   start = function(port, opts)
+      port = port or 7888
+      local server, err = assert(socket.bind("localhost", port))
       opts = opts or {}
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
 
       if(server) then
          server:settimeout(0.000001)
-         print("Server started on " .. host .. ":" .. port .. "...")
+         print("Server started on port" .. port .. "...")
          return coroutine.create(function()
                loop(server, opts.sandbox, opts.handlers, opts.middleware)
          end)

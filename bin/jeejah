@@ -2,12 +2,10 @@
 
 require "luarocks.loader"
 
-local opts, host, port = {}
+local opts, port = {}
 
 for n,v in ipairs(arg) do
-   if(v == "--host") then
-      host = arg[n+1]
-   elseif(v == "--port") then
+   if(v == "--port") then
       port = arg[n+1]
    elseif(v == "--fennel") then
       local fennel = require("fennel")
@@ -32,7 +30,7 @@ for n,v in ipairs(arg) do
    elseif(v == "--version" or v == "--help") then
       print("jeejah 0.2.0\n")
       print("Options:")
-      print("  --host    Hostname on which to listen")
+      print("  --fennel  Start a Fennel server instead of Lua")
       print("  --port    Port on which to listen")
       print("  --debug   Print verbose debugging information")
       os.exit(0)
@@ -41,5 +39,5 @@ end
 
 local root_dir = debug.getinfo(1).source:sub(2, -(1+#"bin/jeejah"))
 local jeejah = dofile(root_dir .. "jeejah.lua")
-local coro = jeejah.start(host, port, opts)
+local coro = jeejah.start(port, opts)
 while true do coroutine.resume(coro) end

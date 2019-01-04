@@ -46,13 +46,13 @@ You can launch a standalone nREPL server:
     $ bin/jeejah
 
 Pass in a `--fennel` flag to start a server for evaluating Fennel
-code. Accepts `--host` and `--port` args. Also accepts `--debug` flag.
+code. Accepts a `--port` argument. Also accepts `--debug` flag.
 
 You can use it as a library too, of course:
 
 ```lua
 local jeejah = require("jeejah")
-local coro = jeejah.start(host, port, {debug=true, sandbox={x=12}})
+local coro = jeejah.start(port, {debug=true, sandbox={x=12}})
 while true do coroutine.resume(coro) end
 ```
 
