@@ -1,10 +1,10 @@
 -- -*- lua -*-
 
 package = "jeejah"
-version = "0.2.0-1"
+version = "0.2.1-1"
 source = {
    url = "https://gitlab.com/technomancy/jeejah.git",
-   tag = "0.2.0",
+   tag = "0.2.1",
 }
 description = {
    summary = "An nREPL server",
@@ -16,7 +16,7 @@ description = {
    license = "MIT/X11",
 }
 dependencies = {
-   "lua ~> 5.1",
+   "lua >= 5.1, < 5.4",
    "luasocket = 3.0rc1-2",
    "serpent = 0.28-1",
    "bencode = 2.2.0-1",
