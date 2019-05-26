@@ -270,6 +270,7 @@ end
 local connections = {}
 
 local function loop(server, sandbox, handlers, middleware)
+   socket.sleep(timeout)
    local conn, err = server:accept()
    local stop = coroutine.yield() == "stop"
    if(conn) then
