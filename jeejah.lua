@@ -2,14 +2,16 @@ local socket = require "socket"
 local serpent = require "serpent"
 local bencode = require "bencode"
 
-local load    = loadstring or load
+local load = loadstring or load
 
 local timeout = 0.001
 
 local pack = function(...) return {...} end
-local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
 local d = function(_) end
-local serpent_pp = function(x) print(serpent.block(x, serpent_opts)) end
+local serpent_pp = function(p) return function(x)
+      local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
+      p(serpent.block(x, serpent_opts)) end
+end
 local sessions = {}
 
 local response_for = function(old_msg, msg)
@@ -60,12 +62,13 @@ end
 -- for stuff that's shared between eval and load_file
 local execute_chunk = function(session, chunk, pp)
    local old_write, old_print, old_read = io.write, print, io.read
-   pp = pp or serpent_pp
    if(session.sandbox) then
       setfenv(chunk, session.sandbox)
+      pp = pp or serpent_pp(session.sandbox.print)
    else
       _G.print = print_for(session.write)
       _G.io.write, _G.io.read = session.write, session.read
+      pp = pp or serpent_pp(_G.print)
    end
 
    local trace, err
