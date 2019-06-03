@@ -182,9 +182,7 @@ local handle = function(conn, handlers, sandbox, msg)
       d("Evaluating", msg.code)
       local value, err = eval(session_for(conn, msg, sandbox), msg.code, msg.pp)
       d("Got", value, err)
-      -- monroe has a bug that requires status=done to be a separate message
-      send(conn, response_for(msg, {value=value, ex=err}))
-      send(conn, response_for(msg, {status={"done"}}))
+      send(conn, response_for(msg, {value=value, ex=err, status={"done"}}))
    elseif(msg.op == "load-file") then
       d("Loading file", msg.file)
       local value, err = load_file(session_for(conn, msg, sandbox),
@@ -303,20 +301,16 @@ end
 return {
    start = function(port, opts)
       port = port or 7888
-      local server, err = assert(socket.bind("localhost", port))
+      local server = assert(socket.bind("localhost", port))
       opts = opts or {}
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
 
-      if(server) then
-         server:settimeout(0.000001)
-         print("Server started on port " .. port .. "...")
-         return coroutine.create(function()
-               loop(server, opts.sandbox, opts.handlers, opts.middleware)
-         end)
-      else
-         print("  | Error starting socket repl server: " .. err)
-      end
+      server:settimeout(0.01)
+      print("Server started on port " .. port .. "...")
+      return coroutine.create(function()
+            loop(server, opts.sandbox, opts.handlers, opts.middleware)
+      end)
    end,
 
    stop = function(coro)

@@ -37,6 +37,9 @@ operating system does not provide it, you can install it using LuaRocks:
 
     $ luarocks install --local luasocket
 
+Note that [LÖVE](https://love2d.org) ships with its own copy of
+luasocket, so there is no need to install it there.
+
 You can symlink `bin/jeejah` to your `$PATH` or something.
 
 ## Usage
