@@ -31,8 +31,10 @@ end
 
 local print_for = function(write)
    return function(...)
-      for _,x in ipairs({...}) do write(x) end
-      write("\n")
+      local args = {...}
+      for i,x in ipairs(args) do args[i] = tostring(x) end
+      table.insert(args, "\n")
+      write(table.concat(args, " "))
    end
 end
 
