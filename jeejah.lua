@@ -6,7 +6,6 @@ local load = loadstring or load
 
 local timeout = 0.001
 
-local pack = function(...) return {...} end
 local d = function(_) end
 local serpent_pp = function(p) return function(x)
       local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
@@ -72,9 +71,9 @@ local execute_chunk = function(session, chunk, pp)
    end
 
    local trace, err
-   local result = pack(xpcall(chunk, function(e)
-                                 trace = debug.traceback()
-                                 err = e end))
+   local result = {xpcall(chunk, function(e)
+                             trace = debug.traceback()
+                             err = e end)}
 
    _G.print, _G.io.write, _G.io.read = old_print, old_write, old_read
 
