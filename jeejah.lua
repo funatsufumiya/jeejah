@@ -112,7 +112,7 @@ local register_session = function(conn, msg, provided_sandbox)
    local session = tostring(math.random(999999999))
    local write = write_for(conn, msg)
    local sandbox = provided_sandbox and sandbox_for(write, provided_sandbox)
-   sessions[session] = { conn = conn, write = write,
+   sessions[session] = { conn = conn, write = write, print = print_for(write),
                          sandbox = sandbox, coros = {}}
    return response_for(msg, {["new-session"]=session, status={"done"}})
 end
@@ -184,7 +184,9 @@ local handle = function(conn, handlers, sandbox, msg)
       d("Evaluating", msg.code)
       local value, err = eval(session_for(conn, msg, sandbox), msg.code, msg.pp)
       d("Got", value, err)
-      send(conn, response_for(msg, {value=value, ex=err, status={"done"}}))
+      -- monroe bug means you have to send done status separately
+      send(conn, response_for(msg, {value=value, ex=err}))
+      send(conn, response_for(msg, {status={"done"}}))
    elseif(msg.op == "load-file") then
       d("Loading file", msg.file)
       local value, err = load_file(session_for(conn, msg, sandbox),
@@ -269,20 +271,19 @@ end
 
 local connections = {}
 
-local function loop(server, sandbox, handlers, middleware)
+local function loop(server, sandbox, handlers, middleware, foreground)
    socket.sleep(timeout)
    local conn, err = server:accept()
-   local stop = coroutine.yield() == "stop"
+   local stop = (not foreground) and (coroutine.yield() == "stop")
    if(conn) then
       conn:settimeout(timeout)
       d("Connected.")
       local coro = coroutine.create(function()
-            -- local h_err = handle_loop(conn, sandbox, handlers, middleware)
             local ok, h_err = pcall(handle_loop, conn, sandbox, handlers, middleware)
             d("Connection closed: " .. h_err)
       end)
       table.insert(connections, coro)
-      return loop(server, sandbox, handlers, middleware)
+      return loop(server, sandbox, handlers, middleware, foreground)
    else
       if(err ~= "timeout") then print("  | Socket error: " .. err) end
       for _,c in ipairs(connections) do coroutine.resume(c) end
@@ -290,31 +291,38 @@ local function loop(server, sandbox, handlers, middleware)
          server:close()
          print("Server stopped.")
       else
-         return loop(server, sandbox, handlers, middleware)
+         return loop(server, sandbox, handlers, middleware, foreground)
       end
    end
 end
 
--- Start an nrepl socket server on the given port. For opts
--- you can pass a table with fg=true to run in the foreground, debug=true for
--- verbose logging, and sandbox={...} to evaluate all code in a sandbox.
--- You can also give an opts.handlers table keying ops to handler functions
--- which take the socket, the decoded message, and the optional sandbox table.
 return {
+   -- Start an nrepl socket server on the given port. For opts you can pass a
+   -- table with foreground=true to run in the foreground, debug=true for
+   -- verbose logging, and sandbox={...} to evaluate all code in a sandbox.  You
+   -- can also give an opts.handlers table keying ops to handler functions which
+   -- take the socket, the decoded message, and the optional sandbox table.
    start = function(port, opts)
       port = port or 7888
-      local server = assert(socket.bind("localhost", port))
       opts = opts or {}
+      -- host should always be localhost on a PC, but not always on a micro
+      local server = assert(socket.bind(opts.host or "localhost", port))
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
 
       server:settimeout(0.01)
       print("Server started on port " .. port .. "...")
-      return coroutine.create(function()
-            loop(server, opts.sandbox, opts.handlers, opts.middleware)
-      end)
+      if opts.foreground then
+         return loop(server, opts.sandbox, opts.handlers,
+                     opts.middleware, opts.foreground)
+      else
+         return coroutine.create(function()
+               loop(server, opts.sandbox, opts.handlers, opts.middleware)
+         end)
+      end
    end,
 
+   -- Pass in the coroutine from jeejah.start to this function to stop it.
    stop = function(coro)
       coroutine.resume(coro, "stop")
    end,

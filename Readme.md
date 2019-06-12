@@ -56,13 +56,15 @@ You can use it as a library too, of course:
 ```lua
 local jeejah = require("jeejah")
 local coro = jeejah.start(port, {debug=true, sandbox={x=12}})
-while true do coroutine.resume(coro) end
 ```
 
 The function returns a coroutine which you'll need to repeatedly
 resume in order to handle requests. Each accepted connection is stored
 in a coroutine internal to that function; these are each repeatedly
-resumed by the main coroutine.
+resumed by the main coroutine. If all you're doing is starting an
+nrepl server, you can pass `foreground=true` in the options table to
+leave the server running in the foreground and skip the step of
+resuming the coroutine.
 
 Note that the sandbox feature is not well-tested or audited and should
 not be trusted to provide robust security.
@@ -80,12 +82,12 @@ by default) when connected.
 
 ## Caveats
 
-Lua 5.1 does not allow yielding coroutines from inside protected
+PUC Lua 5.1 does not allow yielding coroutines from inside protected
 calls, which means you cannot use `io.read`, though LuaJIT and
 Lua 5.2+ allow it.
 
 ## License
 
-Copyright © 2016-2018 Phil Hagelberg and contributors
+Copyright © 2016-2019 Phil Hagelberg and contributors
 
 Distributed under the MIT license; see file LICENSE

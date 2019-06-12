@@ -2,7 +2,7 @@
 
 require "luarocks.loader"
 
-local opts, port = {}
+local opts, port = {foreground = true}
 
 for n,v in ipairs(arg) do
    if(v == "--port") then
@@ -40,5 +40,4 @@ end
 local root_dir = debug.getinfo(1).source:sub(2, -(1+#"bin/jeejah"))
 local search_parent = string.format("%s?.lua;%s", root_dir, package.path)
 local jeejah = dofile(package.searchpath("jeejah", search_parent))
-local coro = jeejah.start(port, opts)
-while true do coroutine.resume(coro) end
+jeejah.start(port, opts)
