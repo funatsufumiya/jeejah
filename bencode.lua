@@ -61,6 +61,7 @@ local function count(tbl)
 end
 
 function encode(x)
+   local unpack = unpack or table.unpack
    if(type(x) == "table" and select("#", unpack(x)) == count(x)) then
       return encode_list(x)
    elseif(type(x) == "table") then
