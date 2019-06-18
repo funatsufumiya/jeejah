@@ -312,7 +312,7 @@ return {
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
 
-      server:settimeout(0.01)
+      server:settimeout(timeout)
       print("Server started on port " .. port .. "...")
       if opts.foreground then
          return loop(server, opts.sandbox, opts.handlers,
