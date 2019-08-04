@@ -1,10 +1,10 @@
 -- -*- lua -*-
 
 package = "jeejah"
-version = "0.2.1-1"
+version = "0.2.1-4"
 source = {
    url = "git+https://gitlab.com/technomancy/jeejah.git",
-   tag = "0.2.1",
+   tag = "0.2.4",
 }
 description = {
    summary = "An nREPL server",
