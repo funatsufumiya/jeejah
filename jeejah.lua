@@ -221,7 +221,6 @@ local handler_coros = {}
 
 local function receive(conn, partial)
    local s, err = conn:receive(1) -- wow this is primitive
-   coroutine.yield()
    -- iterate backwards so we can safely remove
    for i=#handler_coros, 1, -1 do
       coroutine.resume(handler_coros[i])
@@ -233,6 +232,7 @@ local function receive(conn, partial)
    if(s) then
       return receive(conn, (partial or "") .. s)
    elseif(err == "timeout" and partial == nil) then
+      coroutine.yield() 
       return receive(conn)
    elseif(err == "timeout") then
       return partial
