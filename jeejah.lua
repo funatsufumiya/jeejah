@@ -14,7 +14,9 @@ end
 local sessions = {}
 
 local response_for = function(old_msg, msg)
-   msg.session, msg.id, msg.ns = old_msg.session, old_msg.id, ""
+   -- certain implementations break when the ns field is empty; see
+   -- https://gitlab.com/technomancy/jeejah/issues/5
+   msg.session, msg.id, msg.ns = old_msg.session, old_msg.id, "*none*"
    return msg
 end
 
