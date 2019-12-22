@@ -9,7 +9,8 @@ for n,v in ipairs(arg) do
       port = arg[n+1]
    elseif(v == "--fennel") then
       local fennel = require("fennel")
-      table.insert(package.loaders, fennel.make_searcher({correlate=true}))
+      table.insert(package.loaders or package.searchers,
+                   fennel.make_searcher({correlate=true}))
       local view = require("fennelview")
       opts.middleware = function(f, msg)
          if(msg.op == "load-file") then
