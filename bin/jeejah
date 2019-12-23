@@ -40,5 +40,11 @@ end
 
 local root_dir = debug.getinfo(1).source:sub(2, -(1+#"bin/jeejah"))
 local search_parent = string.format("%s?.lua;%s", root_dir, package.path)
-local jeejah = dofile(package.searchpath("jeejah", search_parent))
-jeejah.start(port, opts)
+if(package.searchpath) then
+   local jeejah = dofile(package.searchpath("jeejah", search_parent))
+   jeejah.start(port, opts)
+else -- 5.1
+   if root_dir == "" then root_dir = "." end
+   local jeejah = dofile(root_dir .. "/jeejah.lua")
+   jeejah.start(port, opts)
+end
