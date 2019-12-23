@@ -179,7 +179,7 @@ local handle = function(conn, handlers, sandbox, msg)
       d("Custom op:", msg.op)
       local write = write_for(conn, msg)
       handlers[msg.op](conn, msg, session_for(conn, msg, sandbox),
-                       send, response_for, write)
+                       send, response_for)
    elseif(msg.op == "clone") then
       d("New session.")
       send(conn, register_session(conn, msg, sandbox))
