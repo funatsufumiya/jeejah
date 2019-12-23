@@ -6,7 +6,7 @@ local load = loadstring or load
 
 local timeout = 0.001
 
-local d = function(_) end
+local d = os.getenv("DEBUG") and print or function(_) end
 local serpent_pp = function(p) return function(x)
       local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
       p(serpent.block(x, serpent_opts)) end
@@ -223,8 +223,9 @@ local function receive(conn, partial)
    local s, err = conn:receive(1) -- wow this is primitive
    -- iterate backwards so we can safely remove
    for i=#handler_coros, 1, -1 do
-      coroutine.resume(handler_coros[i])
+      local ok, err2 = coroutine.resume(handler_coros[i])
       if(coroutine.status(handler_coros[i]) ~= "suspended") then
+         if(not ok) then print("  | Handler error", err2) end
          table.remove(handler_coros, i)
       end
    end
@@ -232,7 +233,7 @@ local function receive(conn, partial)
    if(s) then
       return receive(conn, (partial or "") .. s)
    elseif(err == "timeout" and partial == nil) then
-      coroutine.yield() 
+      coroutine.yield()
       return receive(conn)
    elseif(err == "timeout") then
       return partial
@@ -241,7 +242,7 @@ local function receive(conn, partial)
    end
 end
 
-local function handle_loop(conn, sandbox, handlers, middleware)
+local function client_loop(conn, sandbox, handlers, middleware)
    local input, r_err = receive(conn)
    if(input) then
       local decoded, d_err = bencode.decode(input)
@@ -256,10 +257,14 @@ local function handle_loop(conn, sandbox, handlers, middleware)
          local coro = coroutine.create(handle)
          if(middleware) then
             middleware(function(msg)
-                          coroutine.resume(coro, conn, handlers, sandbox, msg)
+                  local ok, err = coroutine.resume(coro, conn, handlers,
+                                                   sandbox, msg)
+                  if(not ok) then print("  | Handler error", err) end
                        end, decoded)
          else
-            coroutine.resume(coro, conn, handlers, sandbox, decoded)
+            local ok, err = coroutine.resume(coro, conn, handlers,
+                                             sandbox, decoded)
+            if(not ok) then print("  | Handler error", err) end
          end
          if(coroutine.status(coro) == "suspended") then
             table.insert(handler_coros, coro)
@@ -267,7 +272,7 @@ local function handle_loop(conn, sandbox, handlers, middleware)
       else
          print("  | Decoding error:", d_err)
       end
-      return handle_loop(conn, sandbox, handlers, middleware)
+      return client_loop(conn, sandbox, handlers, middleware)
    else
       return r_err
    end
@@ -283,8 +288,8 @@ local function loop(server, sandbox, handlers, middleware, foreground)
       conn:settimeout(timeout)
       d("Connected.")
       local coro = coroutine.create(function()
-            local ok, h_err = pcall(handle_loop, conn, sandbox, handlers, middleware)
-            d("Connection closed: " .. h_err)
+            local _, h_err = pcall(client_loop, conn, sandbox, handlers, middleware)
+            if(h_err ~= "closed") then print("Connection closed: " .. h_err) end
       end)
       table.insert(connections, coro)
       return loop(server, sandbox, handlers, middleware, foreground)
