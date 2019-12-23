@@ -8,22 +8,7 @@ for n,v in ipairs(arg) do
    if(v == "--port") then
       port = arg[n+1]
    elseif(v == "--fennel") then
-      local fennel = require("fennel")
-      table.insert(package.loaders or package.searchers,
-                   fennel.make_searcher({correlate=true}))
-      local view = require("fennelview")
-      opts.middleware = function(f, msg)
-         if(msg.op == "load-file") then
-            local f = assert(io.open(msg.filename, "rb"))
-            msg.op, msg.code = "eval", f:read("*all"):gsub("^#![^\n]*\n", "")
-            f:close()
-         end
-         if(msg.op == "eval") then
-            msg.pp = view
-            msg.code = fennel.compileString(msg.code)
-         end
-         return f(msg)
-      end
+      opts.fennel = true
    elseif(v == "--debug") then
       opts.debug = true
    elseif(v == "--empty-sandbox") then

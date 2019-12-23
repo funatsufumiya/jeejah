@@ -48,8 +48,8 @@ You can launch a standalone nREPL server:
 
     $ bin/jeejah
 
-Pass in a `--fennel` flag to start a server for evaluating Fennel
-code. Accepts a `--port` argument. Also accepts `--debug` flag.
+Pass in a `--fennel` flag to start a server for evaluating Fennel code
+instead of Lua. Accepts a `--port` argument and a `--debug` flag.
 
 You can use it as a library too, of course:
 
@@ -67,7 +67,8 @@ leave the server running in the foreground and skip the step of
 resuming the coroutine.
 
 Note that the sandbox feature is not well-tested or audited and should
-not be trusted to provide robust security.
+not be trusted to provide robust security. It currently only works
+with Lua 5.1 and LuaJIT.
 
 You can also pass in a `handlers` table where the keys are custom
 [nREPL ops](https://nrepl.org/nrepl/ops.html)

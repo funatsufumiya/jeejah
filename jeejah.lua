@@ -16,7 +16,7 @@ local sessions = {}
 local response_for = function(old_msg, msg)
    -- certain implementations break when the ns field is empty; see
    -- https://gitlab.com/technomancy/jeejah/issues/5
-   msg.session, msg.id, msg.ns = old_msg.session, old_msg.id, "*none*"
+   msg.session, msg.id, msg.ns = old_msg.session, old_msg.id, ">"
    return msg
 end
 
@@ -113,12 +113,12 @@ local load_file = function(session, file, loader)
 end
 
 local register_session = function(conn, msg, provided_sandbox)
-   local session = tostring(math.random(999999999))
+   local id = tostring(math.random(999999999))
    local write = write_for(conn, msg)
    local sandbox = provided_sandbox and sandbox_for(write, provided_sandbox)
-   sessions[session] = { conn = conn, write = write, print = print_for(write),
-                         sandbox = sandbox, coros = {}}
-   return response_for(msg, {["new-session"]=session, status={"done"}})
+   sessions[id] = { conn = conn, write = write, print = print_for(write),
+                    sandbox = sandbox, coros = {}, id = id}
+   return response_for(msg, {["new-session"]=id, status={"done"}})
 end
 
 local unregister_session = function(msg)
@@ -177,7 +177,9 @@ end
 local handle = function(conn, handlers, sandbox, msg)
    if(handlers and handlers[msg.op]) then
       d("Custom op:", msg.op)
-      handlers[msg.op](conn, msg, session_for(conn, msg, sandbox))
+      local write = write_for(conn, msg)
+      handlers[msg.op](conn, msg, session_for(conn, msg, sandbox),
+                       send, response_for, write)
    elseif(msg.op == "clone") then
       d("New session.")
       send(conn, register_session(conn, msg, sandbox))
@@ -314,10 +316,13 @@ return {
    start = function(port, opts)
       port = port or 7888
       opts = opts or {}
+      opts.handlers = opts.handlers or {}
       -- host should always be localhost on a PC, but not always on a micro
       local server = assert(socket.bind(opts.host or "localhost", port))
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
+      if(opts.fennel) then opts.handlers.eval = require("jeejah.fenneleval") end
+      assert(not opts.sandbox or setfenv, "Can't use sandbox on 5.2+")
 
       server:settimeout(timeout)
       print("Server started on port " .. port .. "...")
