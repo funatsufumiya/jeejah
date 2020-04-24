@@ -177,7 +177,6 @@ end
 local handle = function(conn, handlers, sandbox, msg)
    if(handlers and handlers[msg.op]) then
       d("Custom op:", msg.op)
-      local write = write_for(conn, msg)
       handlers[msg.op](conn, msg, session_for(conn, msg, sandbox),
                        send, response_for)
    elseif(msg.op == "clone") then
