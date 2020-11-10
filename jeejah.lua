@@ -243,10 +243,11 @@ local function receive(conn, partial)
    end
 end
 
-local function client_loop(conn, sandbox, handlers, middleware)
-   local input, r_err = receive(conn)
+local function client_loop(conn, sandbox, handlers, middleware, partial)
+   local input, r_err = receive(conn, partial)
    if(input) then
       local decoded, d_err = bencode.decode(input)
+      if decoded and d_err < #input then partial = input:sub(d_err + 1) else partial = nil end
       coroutine.yield()
       if(decoded and decoded.op == "close") then
          d("End session.")
@@ -273,7 +274,7 @@ local function client_loop(conn, sandbox, handlers, middleware)
       else
          print("  | Decoding error:", d_err)
       end
-      return client_loop(conn, sandbox, handlers, middleware)
+      return client_loop(conn, sandbox, handlers, middleware, partial)
    else
       return r_err
    end
