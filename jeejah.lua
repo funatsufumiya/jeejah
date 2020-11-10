@@ -321,7 +321,11 @@ return {
       local server = assert(socket.bind(opts.host or "localhost", port))
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
-      if(opts.fennel) then opts.handlers.eval = require("jeejah.fenneleval") end
+      if(opts.fennel) then 
+         local fenneleval = require("jeejah.fenneleval") 
+         opts.handlers.eval = fenneleval
+         opts.handlers.stdin = fenneleval
+      end
       assert(not opts.sandbox or setfenv, "Can't use sandbox on 5.2+")
 
       server:settimeout(timeout)

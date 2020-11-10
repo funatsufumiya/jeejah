@@ -17,7 +17,7 @@ end
 
 local make_repl = function(session, repls)
    local on_values = function(xs)
-      session.write(table.concat(xs, "\n") .. "\n")
+      session.values(xs)
       session.done({status={"done"}})
    end
    local read = function()
@@ -25,11 +25,22 @@ local make_repl = function(session, repls)
       local input = coroutine.yield()
       if(input:find("^%s*$")) then return "nil\n" else return input end
    end
-   local err = function(errtype, msg) write({errtype, msg}) session.done() end
+   local err = function(errtype, msg) session.write(table.concat({errtype, msg}, ": ")) session.done() end
 
-   local env = session.sandbox or {io={}}
+   local env = session.sandbox
+   if not env then
+      env = {}
+      for k, v in pairs(_G) do env[k] = v end
+      env.io = {}
+   end
    env.print = print_for(session.write)
-   env.io.write, env.io.read = session.write, session.read
+   env.io.write = session.write
+   env.io.read = function()
+      session.needinput()
+      local input, done = coroutine.yield()
+      done()
+      return input
+   end
 
    local f = function()
       return fennel.repl({readChunk = read,
@@ -45,7 +56,13 @@ end
 
 return function(conn, msg, session, send, response_for)
    d("Evaluating", msg.code)
-   session.done = function() send(conn, response_for(msg, {status={"done"}})) end
    local repl = repls[session.id] or make_repl(session, repls)
-   repl(msg.code .. "\n")
+   if msg.op == "eval" then
+      session.values = function(xs) send(conn, response_for(msg, {value=table.concat(xs, "\n") .. "\n"})) end
+      session.done = function() send(conn, response_for(msg, {status={"done"}})) end
+      session.needinput = function() send(conn, response_for(msg, {status={"need-input"}})) end   
+      repl(msg.code .. "\n")
+   elseif msg.op == "stdin" then
+      repl(msg.stdin, function() send(conn, response_for(msg, {status={"done"}})) end)
+   end
 end
