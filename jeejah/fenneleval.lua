@@ -1,5 +1,6 @@
 local fennel = require("fennel")
-local fennelview = pcall(require, "fennelview") or fennel.dofile("fennelview.fnl")
+local fennelview_ok, fennelview = pcall(require, "fennelview")
+if not fennelview_ok then fennelview = fennel.dofile("fennelview.fnl") end
 
 local d = os.getenv("DEBUG") and print or function(_) end
 
