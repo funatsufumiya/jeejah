@@ -247,7 +247,11 @@ local function client_loop(conn, sandbox, handlers, middleware, partial)
    local input, r_err = receive(conn, partial)
    if(input) then
       local decoded, d_err = bencode.decode(input)
-      if decoded and d_err < #input then partial = input:sub(d_err + 1) else partial = nil end
+      if decoded and d_err < #input then
+         partial = input:sub(d_err + 1)
+      else
+         partial = nil
+      end
       coroutine.yield()
       if(decoded and decoded.op == "close") then
          d("End session.")
@@ -321,8 +325,8 @@ return {
       local server = assert(socket.bind(opts.host or "localhost", port))
       if(opts.debug) then d = print end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
-      if(opts.fennel) then 
-         local fenneleval = require("jeejah.fenneleval") 
+      if(opts.fennel) then
+         local fenneleval = require("jeejah.fenneleval")
          opts.handlers.eval = fenneleval
          opts.handlers.stdin = fenneleval
       end

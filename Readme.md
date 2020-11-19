@@ -1,6 +1,6 @@
 # JeeJah
 
-An nREPL server for Fennel and Lua.
+An nREPL server for [Fennel](https://fennel-lang.org) and [Lua](https://lua.org).
 
 ## A what now?
 
@@ -16,7 +16,7 @@ evaluated. It supports evaluating snippets of code or whole files with
 
 This library was originally written to add Emacs support to
 [Bussard](https://gitlab.com/technomancy/bussard), a spaceflight
-programming game. See the file `data/upgrades.lua`.
+programming game.
 
 Currently mainly tested with
 [monroe](https://github.com/sanel/monroe/) and
@@ -89,6 +89,6 @@ Lua 5.2+ allow it.
 
 ## License
 
-Copyright © 2016-2019 Phil Hagelberg and contributors
+Copyright © 2016-2020 Phil Hagelberg and contributors
 
 Distributed under the MIT license; see file LICENSE

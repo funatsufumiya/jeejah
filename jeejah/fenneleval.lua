@@ -25,7 +25,9 @@ local make_repl = function(session, repls)
       local input = coroutine.yield()
       if(input:find("^%s*$")) then return "nil\n" else return input end
    end
-   local err = function(errtype, msg) session.write(table.concat({errtype, msg}, ": ")) session.done() end
+   local err = function(errtype, msg)
+      session.write(table.concat({errtype, msg}, ": ")) session.done()
+   end
 
    local env = session.sandbox
    if not env then
@@ -58,11 +60,18 @@ return function(conn, msg, session, send, response_for)
    d("Evaluating", msg.code)
    local repl = repls[session.id] or make_repl(session, repls)
    if msg.op == "eval" then
-      session.values = function(xs) send(conn, response_for(msg, {value=table.concat(xs, "\n") .. "\n"})) end
-      session.done = function() send(conn, response_for(msg, {status={"done"}})) end
-      session.needinput = function() send(conn, response_for(msg, {status={"need-input"}})) end   
+      session.values = function(xs)
+         send(conn, response_for(msg, {value=table.concat(xs, "\n") .. "\n"}))
+      end
+      session.done = function()
+         send(conn, response_for(msg, {status={"done"}}))
+      end
+      session.needinput = function()
+         send(conn, response_for(msg, {status={"need-input"}}))
+      end
       repl(msg.code .. "\n")
    elseif msg.op == "stdin" then
-      repl(msg.stdin, function() send(conn, response_for(msg, {status={"done"}})) end)
+      repl(msg.stdin,
+           function() send(conn, response_for(msg, {status={"done"}})) end)
    end
 end
