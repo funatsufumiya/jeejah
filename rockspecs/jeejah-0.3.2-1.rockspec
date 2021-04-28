@@ -1,7 +1,7 @@
 -- -*- lua -*-
 
 package = "jeejah"
-version = "0.3.2-5"
+version = "0.3.2-1"
 source = {
    url = "git+https://gitlab.com/technomancy/jeejah.git",
    tag = "0.3.2",
