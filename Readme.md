@@ -58,13 +58,21 @@ local jeejah = require("jeejah")
 local coro = jeejah.start(port, {debug=true, sandbox={x=12}})
 ```
 
+The `start` function takes a `port` argument as well as an `options`
+table. The `opts` table takes a few options:
+
+* `debug`: Log more.
+* `foreground`: Leave the server running in the foreground and skip the
+  step of resuming the coroutine.
+* `timeout`: Override the default timeout (in seconds).
+* `fennel`: Evaluate code as fennel.
+* `serializer`: Replace `serpent.block` with the provided function to
+  serialize objects to string.
+
 The function returns a coroutine which you'll need to repeatedly
 resume in order to handle requests. Each accepted connection is stored
 in a coroutine internal to that function; these are each repeatedly
-resumed by the main coroutine. If all you're doing is starting an
-nrepl server, you can pass `foreground=true` in the options table to
-leave the server running in the foreground and skip the step of
-resuming the coroutine.
+resumed by the main coroutine.
 
 Note that the sandbox feature is not well-tested or audited and should
 not be trusted to provide robust security. It currently only works
