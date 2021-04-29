@@ -1,5 +1,4 @@
 local socket = require "socket"
-local serpent = require "serpent"
 local bencode = require "bencode"
 
 local load = loadstring or load
@@ -7,11 +6,13 @@ local load = loadstring or load
 local timeout = 0.001
 
 local d = os.getenv("DEBUG") and print or function(_) end
-local serpent_pp = function(p) return function(x)
-      local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
-      p(serpent.block(x, serpent_opts)) end
-end
+local serializer = tostring
 local sessions = {}
+local compose = function(printer, serializer)
+   return function(...)
+        printer(serializer(...))
+   end
+end
 
 local response_for = function(old_msg, msg)
    -- certain implementations break when the ns field is empty; see
@@ -67,11 +68,11 @@ local execute_chunk = function(session, chunk, pp)
    local old_write, old_print, old_read = io.write, print, io.read
    if(session.sandbox) then
       setfenv(chunk, session.sandbox)
-      pp = pp or serpent_pp(session.sandbox.print)
+      pp = pp or compose(session.sandbox.print, serializer)
    else
       _G.print = print_for(session.write)
       _G.io.write, _G.io.read = session.write, session.read
-      pp = pp or serpent_pp(_G.print)
+      pp = pp or compose(_G.print, serializer)
    end
 
    local trace, err
@@ -208,13 +209,13 @@ local handle = function(conn, handlers, sandbox, msg)
       local session_sandbox = session_for(conn, msg, sandbox).sandbox
       send(conn, complete(msg, session_sandbox))
    elseif(msg.op == "stdin") then
-      d("Stdin", serpent.block(msg))
+      d("Stdin", serializer(msg))
       sessions[msg.session].input = msg.stdin
       send(conn, response_for(msg, {status={"done"}}))
       return
    elseif(msg.op ~= "interrupt") then -- silently ignore interrupt
       send(conn, response_for(msg, {status={"unknown-op"}}))
-      print("  | Unknown op", serpent.block(msg))
+      print("  | Unknown op", serializer(msg))
    end
 end
 
@@ -324,6 +325,16 @@ return {
       -- host should always be localhost on a PC, but not always on a micro
       local server = assert(socket.bind(opts.host or "localhost", port))
       if(opts.debug) then d = print end
+      if(opts.serialize) then
+         serializer = opts.serialize
+      else
+          local serpent = require("serpent")
+          local serpent_pp = function(x)
+              local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
+              return serpent.block(x, serpent_opts)
+          end
+          serializer = serpent_pp
+      end
       if(opts.timeout) then timeout = tonumber(opts.timeout) end
       if(opts.fennel) then
          local fenneleval = require("jeejah.fenneleval")
