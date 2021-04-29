@@ -8,6 +8,11 @@ local timeout = 0.001
 local d = os.getenv("DEBUG") and print or function(_) end
 local serializer = tostring
 local sessions = {}
+local compose = function(printer, serializer)
+   return function(...)
+        printer(serializer(...))
+   end
+end
 
 local response_for = function(old_msg, msg)
    -- certain implementations break when the ns field is empty; see
@@ -63,11 +68,11 @@ local execute_chunk = function(session, chunk, pp)
    local old_write, old_print, old_read = io.write, print, io.read
    if(session.sandbox) then
       setfenv(chunk, session.sandbox)
-      pp = pp or session.sandbox.print
+      pp = pp or compose(session.sandbox.print, serializer)
    else
       _G.print = print_for(session.write)
       _G.io.write, _G.io.read = session.write, session.read
-      pp = pp or _G.print
+      pp = pp or compose(_G.print, serializer)
    end
 
    local trace, err
@@ -326,7 +331,7 @@ return {
           local serpent = require("serpent")
           local serpent_pp = function(x)
               local serpent_opts = {maxlevel=8,maxnum=64,nocode=true}
-              serpent.block(x, serpent_opts)
+              return serpent.block(x, serpent_opts)
           end
           serializer = serpent_pp
       end
