@@ -63,8 +63,10 @@ local function encode_str(s) return #s .. ":" .. s end
 local function encode_int(n) return "i" .. tostring(n) .. "e" end
 
 local function encode_table(t)
-   local s = "d"
-   for k,v in pairs(t) do s = s .. encode(k) .. encode(v) end
+   local s, keys = "d", {}
+   for k in pairs(t) do table.insert(keys, k) end
+   table.sort(keys)
+   for _,k in ipairs(keys) do s = s .. encode(k) .. encode(t[k]) end
    return s .. "e"
 end
 
