@@ -108,7 +108,7 @@ end
 local load_file = function(session, file, loader)
    local chunk, err = (loader or loadfile)(file)
    if(not chunk) then
-      return nil, "Compilation error in " .. file ": ".. (err or "unknown")
+      return nil, "Compilation error in " .. file .. ": ".. (err or "unknown")
    end
    return execute_chunk(session, chunk)
 end
