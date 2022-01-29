@@ -129,7 +129,7 @@ end
 
 local describe = function(msg, handlers)
    local ops = { "clone", "close", "describe", "eval", "load-file",
-                 "ls-sessions", "complete", "stdin", "interrupt" }
+                 "lookup", "ls-sessions", "complete", "stdin", "interrupt" }
    for op in handlers do table.insert(ops, op) end
    return response_for(msg, {ops=ops, status={"done"}})
 end
@@ -340,6 +340,7 @@ return {
          local fenneleval = require("jeejah.fenneleval")
          opts.handlers.eval = fenneleval
          opts.handlers.stdin = fenneleval
+         opts.handlers.lookup = fenneleval
       end
       assert(not opts.sandbox or setfenv, "Can't use sandbox on 5.2+")
 
