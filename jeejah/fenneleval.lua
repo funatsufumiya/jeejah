@@ -74,6 +74,22 @@ return function(conn, msg, session, send, response_for)
       d("Evaluating", msg.code)
       repl(msg.stdin,
            function() send(conn, response_for(msg, {status={"done"}})) end)
+   elseif msg.op == "completions" then
+      d("Completions", msg.prefix)
+      session.values = function(xs)
+         local result = {}
+         for _, v in pairs(xs) do
+             table.insert(result, {candidate = v})
+         end
+         send(conn, response_for(msg, {completions = result}))
+      end
+      session.done = function()
+         send(conn, response_for(msg, {status={"done"}}))
+      end
+      session.needinput = function()
+         send(conn, response_for(msg, {status={"need-input"}}))
+      end
+      repl(",complete " .. msg.prefix .. "\n")
    elseif msg.op == "lookup" then
       d("Lookup", msg.sym)
       session.values = function(xs)
