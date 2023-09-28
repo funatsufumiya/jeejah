@@ -2,6 +2,8 @@
 
 An nREPL server for [Fennel](https://fennel-lang.org) and [Lua](https://lua.org).
 
+**Notice**: this project is looking for a new maintainer.
+
 ## A what now?
 
 The [nREPL protocol](https://nrepl.org/nrepl/index.html#_why_nrepl)
