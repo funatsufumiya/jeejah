@@ -5,7 +5,6 @@
 
 ;; TODO:
 ;; * socket select
-;; * accept fennel.repl options table
 ;; * middleware?
 ;; * write .nrepl-port file?
 
@@ -29,22 +28,25 @@
             {:out (.. (table.concat args "\t") "\n")})
       nil)))
 
-(λ make-repl [session]
+(λ make-repl [session options]
   (let [write (write-for session)
         repl-print (print-for session)
-        env {}]
-    (fn onValues [xs]
+        env (or options.env {})]
+    (when (= nil options.env)
+      (set options.env env))
+
+    (fn options.onValues [xs]
       (d :!values (fennel.view xs))
       ;; the spec implies you can combine these, but monroe disagrees
       (send session.conn session.msg {:value (table.concat xs "\t")})
       (send session.conn session.msg {:status [:done]}))
 
-    (fn onError [errtype msg]
+    (fn options.onError [errtype msg]
       (d :!err errtype msg (fennel.view session.msg))
       (send session.conn session.msg {:ex errtype :err (.. msg "\n")})
       (send session.conn session.msg {:status [:done]}))
 
-    (fn readChunk []
+    (fn options.readChunk []
       (let [input (coroutine.yield)]
         (if (input:find "^%s*$")
             "nil\n" ; If we skip empty input, it confuses the client.
@@ -58,14 +60,14 @@
       (let [(input done) (coroutine.yield)]
         (done)
         input))
-    (coroutine.wrap #(fennel.repl {: env : onError : onValues : readChunk}))))
+    (coroutine.wrap #(fennel.repl options))))
 
-(λ register-session [sessions conn]
+(λ register-session [sessions options conn]
   (let [id (tostring (math.random 999999999))
         session {: conn : id}]
     (d :!register id)
     (tset sessions id session)
-    (set session.repl (make-repl session))
+    (set session.repl (make-repl session options))
     (session.repl)
     {:new-session id :status [:done]}))
 
@@ -74,23 +76,23 @@
              :ls-sessions :stdin :interrupt]]
     {: ops :status [:done] :server-name "jeejah" :server-version version}))
 
-(λ session-for [sessions conn msg]
-  (doto (or (. sessions msg.session) (register-session sessions conn))
+(λ session-for [sessions options conn msg]
+  (doto (or (. sessions msg.session) (register-session sessions options conn))
     (tset :msg msg)))
 
-(λ handle [sessions conn msg]
+(λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
   (case msg
-    {:op :clone} (send conn msg (register-session sessions conn))
+    {:op :clone} (send conn msg (register-session sessions options conn))
     {:op :describe} (send conn msg (describe))
     {:op :ls-sessions} (send conn msg
                              {:sessions (icollect [_ {: id} (ipairs sessions)]
                                           id)
                               :status [:done]})
-    {:op :eval} (let [{: repl} (session-for sessions conn msg)]
+    {:op :eval} (let [{: repl} (session-for sessions options conn msg)]
                   (d :!evaluating msg.code)
                   (repl (.. msg.code "\n")))
-    {:op :stdin} (let [session (session-for sessions conn msg)]
+    {:op :stdin} (let [session (session-for sessions options conn msg)]
                    (session.repl msg.stdin)
                    (send conn msg {:status [:done]}))
     {:op :interrupt} nil
@@ -115,7 +117,7 @@
         ?part
         (values nil err))))
 
-(λ client-loop [sessions handler-coros conn ?part]
+(λ client-loop [sessions handler-coros options conn ?part]
   (case (receive handler-coros conn ?part)
     input (let [(decoded d-err) (bencode.decode input)]
             (if (and decoded (< d-err (length input)))
@@ -129,19 +131,20 @@
                   (error :closed))
                 (and decoded (not= decoded.op :close))
                 (let [coro (coroutine.create handle)]
-                  (let [(ok err) (coroutine.resume coro sessions conn decoded)]
+                  (let [(ok err) (coroutine.resume coro sessions options
+                                                   conn decoded)]
                     (when (not ok) (print "  | Handler error" err)))
                   (when (= (coroutine.status coro) :suspended)
                     (table.insert handler-coros coro)))
                 (print "  | Decoding error:" d-err))
-            (client-loop sessions handler-coros conn ?part))
+            (client-loop sessions handler-coros options conn ?part))
     (_ err) (values nil err)))
 
 (λ accept [state conn]
   (conn:settimeout state.timeout)
   (tset state.connections conn
         (coroutine.create #(case (pcall client-loop state.sessions
-                                        state.handler-coros conn)
+                                        state.handler-coros state.options conn)
                              (_ :closed) nil
                              (_ err) (print "Connection closed" err)))))
 
