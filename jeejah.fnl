@@ -72,6 +72,8 @@
     {: ops :status [:done] :server-name "jeejah" :server-version version}))
 
 (λ session-for [sessions options conn msg]
+  ;; the fallback register-session here shouldn't be necessary, but let's
+  ;; just be tolerant in case there are client bugs
   (doto (or (. sessions msg.session) (register-session sessions options conn))
     (tset :msg msg)))
 
@@ -113,14 +115,13 @@
         (values nil err))))
 
 (λ cleanup [state conn why]
-  (when (not= :closed why) (print "Client closed" why))
+  (when (not= :closed why) (print "  | Client closed" why))
   (tset state.connections conn nil)
   (each [i c (ipairs state.sockets)]
     (when (= c conn)
       (table.remove state.sockets i))))
 
 (λ client-loop [{: sessions : handler-coros : options &as state} conn ?part]
-  (d :!receive ?part)
   (case (receive handler-coros conn ?part)
     input (case (bencode.decode input)
             {:op :close} (cleanup state conn :closed)
@@ -154,7 +155,7 @@
         (case (. connections ready)
           coro (case (coroutine.resume coro)
                  (false err) (cleanup state ready err))
-          _ (print "unrecognized connection" ready))))
+          _ (print "  | Unrecognized connection" ready))))
   (loop state))
 
 ;; TODO: middleware API?
