@@ -20,22 +20,20 @@ This library was originally written to add Emacs support to
 [Bussard](https://gitlab.com/technomancy/bussard), a spaceflight
 programming game.
 
-Currently mainly tested with
-[monroe](https://github.com/sanel/monroe/) and
-[shevek](https://git.sr.ht/~technomancy/shevek/) as
-clients. [grenchman](https://leiningen.org/grench.html) version 0.3.0+
-works. Other clients exist for Vim, Eclipse, and Atom, as well as
-several independent command-line clients; however these may require
-some adaptation to work with Jeejah. If you try your favorite client
-and find that it makes Clojure-specific assumptions, please report a
-bug with it so that it can gracefully degrade when those assumptions
-don't hold.
+Currently mainly tested with [monroe](https://github.com/sanel/monroe/)
+Other clients exist for Vim, Eclipse, and VS Code, as well as several
+independent command-line clients; however these may require some
+adaptation to work with Jeejah. If you try your favorite client and
+find that it makes Clojure-specific assumptions, please report a bug
+with it so that it can gracefully degrade when those assumptions don't
+hold.
 
 ## Installation
 
-The pure-Lua dependencies are included (`bencode`, and `fennel`)
-but you will need to install `luasocket` yourself. If your
-operating system does not provide it, you can install it using LuaRocks:
+The pure-Lua dependencies are included (`bencode`, and `fennel`) but
+you will need to install `luasocket` yourself. Try installing it using
+your system package manager first. If your operating system does not
+provide it, you can install it using LuaRocks:
 
     $ luarocks install --local luasocket
 

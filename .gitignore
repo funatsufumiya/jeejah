@@ -1,3 +1,5 @@
 *.src.rock
 *.src.rock.asc
 rockspecs/*asc
+/jeejah
+/scratch.fnl

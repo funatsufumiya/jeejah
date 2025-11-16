@@ -1,3 +1,4 @@
+LUA ?= lua
 FENNEL ?= fennel
 
 DESTDIR ?=
@@ -8,8 +9,12 @@ run: ; $(FENNEL) $(FENNELFLAGS) main.fnl 7888
 
 lint: ; fennel-ls --lint jeejah.fnl
 
+# could pull in luasocket as a submodule here; not that hard
+
 jeejah: main.fnl jeejah.fnl bencode.lua
-	$(FENNEL) $(FENNELFLAGS) --compile --require-as-include $< > $@
+	echo "#!/usr/bin/env $(LUA)" > $@
+	$(FENNEL) $(FENNELFLAGS) --compile --require-as-include $< >> $@
+	chmod 755 $@
 
 fennel.lua: ../fennel/fennel.lua ; cp $< $@
 
