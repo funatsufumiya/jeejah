@@ -2,6 +2,7 @@
 
 (local help (string.format "jeejah %s" jeejah.version))
 
+;; TODO: write .nrepl-port file?
 (case ...
   "--help" (print help)
   n (case (tonumber n)

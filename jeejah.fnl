@@ -3,11 +3,6 @@
 (local bencode (require :bencode))
 (local d (if (os.getenv "DEBUG") print #nil))
 
-;; TODO:
-;; * socket select
-;; * middleware?
-;; * write .nrepl-port file?
-
 (local version "0.4.0-dev")
 
 (λ send [conn from msg]
@@ -117,59 +112,58 @@
         ?part
         (values nil err))))
 
-(λ client-loop [sessions handler-coros options conn ?part]
+(λ cleanup [state conn why]
+  (when (not= :closed why) (print "Client closed" why))
+  (tset state.connections conn nil)
+  (each [i c (ipairs state.sockets)]
+    (when (= c conn)
+      (table.remove state.sockets i))))
+
+(λ client-loop [{: sessions : handler-coros : options &as state} conn ?part]
+  (d :!receive ?part)
   (case (receive handler-coros conn ?part)
-    input (let [(decoded d-err) (bencode.decode input)]
-            (if (and decoded (< d-err (length input)))
-                (set-forcibly! ?part (input:sub (+ d-err 1)))
-                (set-forcibly! ?part nil))
-            (coroutine.yield)
-            (if (and decoded (= decoded.op :close))
-                (do
-                  (tset sessions decoded.session nil)
-                  (send conn {:status [:done]})
-                  (error :closed))
-                (and decoded (not= decoded.op :close))
-                (let [coro (coroutine.create handle)]
-                  (let [(ok err) (coroutine.resume coro sessions options
-                                                   conn decoded)]
-                    (when (not ok) (print "  | Handler error" err)))
-                  (when (= (coroutine.status coro) :suspended)
-                    (table.insert handler-coros coro)))
-                (print "  | Decoding error:" d-err))
-            (client-loop sessions handler-coros options conn ?part))
+    input (case (bencode.decode input)
+            {:op :close} (cleanup state conn :closed)
+            (decoded len) (let [coro (coroutine.create handle)
+                                (ok err) (coroutine.resume coro sessions options
+                                                           conn decoded)
+                                part (if (< len (length input))
+                                         (input:sub (+ len 1))
+                                         nil)]
+                            (when (not ok) (print "  | Handler error" err))
+                            (when (= (coroutine.status coro) :suspended)
+                              (table.insert handler-coros coro))
+                            (client-loop state conn part))
+            (_ err) (print "  | Decoding error:" err))
     (_ err) (values nil err)))
 
 (λ accept [state conn]
-  (conn:settimeout state.timeout)
+  (conn:settimeout 0.01)
+  (table.insert state.sockets conn)
   (tset state.connections conn
-        (coroutine.create #(case (pcall client-loop state.sessions
-                                        state.handler-coros state.options conn)
-                             (_ :closed) nil
-                             (_ err) (print "Connection closed" err)))))
+        (coroutine.create #(case (pcall client-loop state conn)
+                             (_ err) (cleanup state conn err)))))
 
-(λ loop [{: server : connections : timeout &as state}]
-  (socket.sleep timeout)
-  (case (server:accept)
-    conn (do (accept state conn)
-             (loop state))
-    (_ err) (do
-              (when (not= err :timeout) (print (.. "  | Socket error: " err)))
-              (each [conn c (pairs connections)]
-                (case (coroutine.resume c)
-                  false (tset connections conn nil)))
-              (if (= err :closed)
-                  (do
-                    (server:close)
-                    (print "Server stopped."))
-                  (loop state)))))
+(λ loop [{: server : sockets : connections &as state}]
+  (each [_ ready (ipairs (socket.select sockets))]
+    (if (= ready server)
+        (case (server:accept)
+          conn (accept state conn)
+          (_ :timeout) nil
+          (_ err) (error err))
+        (case (. connections ready)
+          coro (case (coroutine.resume coro)
+                 (false err) (cleanup state ready err))
+          _ (print "unrecognized connection" ready))))
+  (loop state))
 
+;; TODO: middleware API?
 (λ start [options]
   (let [port (or options.port 7888)
         server (assert (socket.bind "localhost" port))
         state {: server : options :connections {} :handler-coros {} :sessions {}
-               :timeout (or options.timeout 0.01)}]
-    (server:settimeout state.timeout)
+               :sockets [server]}]
+    (server:settimeout 0.01)
     (print (.. "Server started on port " port "..."))
     (loop state)))
 
