@@ -11,8 +11,6 @@
 
 (local version "0.4.0-dev")
 
-(local sessions {})
-
 (λ send [conn from msg]
   (set (msg.session msg.id msg.ns) (values from.session from.id ">"))
   (d ">" (fennel.view msg))
@@ -62,7 +60,7 @@
         input))
     (coroutine.wrap #(fennel.repl {: env : onError : onValues : readChunk}))))
 
-(λ register-session [conn]
+(λ register-session [sessions conn]
   (let [id (tostring (math.random 999999999))
         session {: conn : id}]
     (d :!register id)
@@ -76,22 +74,23 @@
              :ls-sessions :stdin :interrupt]]
     {: ops :status [:done] :server-name "jeejah" :server-version version}))
 
-(λ session-for [conn msg]
-  (doto (or (. sessions msg.session) (register-session conn))
+(λ session-for [sessions conn msg]
+  (doto (or (. sessions msg.session) (register-session sessions conn))
     (tset :msg msg)))
 
-(λ handle [conn msg]
+(λ handle [sessions conn msg]
   (d "<" (fennel.view msg))
   (case msg
-    {:op :clone} (send conn msg (register-session conn))
+    {:op :clone} (send conn msg (register-session sessions conn))
     {:op :describe} (send conn msg (describe))
     {:op :ls-sessions} (send conn msg
-                             {:sessions (icollect [_ {: id} (ipairs sessions)] id)
+                             {:sessions (icollect [_ {: id} (ipairs sessions)]
+                                          id)
                               :status [:done]})
-    {:op :eval} (let [{: repl} (session-for conn msg)]
+    {:op :eval} (let [{: repl} (session-for sessions conn msg)]
                   (d :!evaluating msg.code)
                   (repl (.. msg.code "\n")))
-    {:op :stdin} (let [session (session-for conn msg)]
+    {:op :stdin} (let [session (session-for sessions conn msg)]
                    (session.repl msg.stdin)
                    (send conn msg {:status [:done]}))
     {:op :interrupt} nil
@@ -99,9 +98,7 @@
         (send conn msg {:status [:unknown-op]})
         (print "  | Unknown op" (fennel.view msg)))))
 
-(local handler-coros {})
-
-(λ receive [conn ?part]
+(λ receive [handler-coros conn ?part]
   (let [(s err) (conn:receive 1)]
     (for [i (length handler-coros) 1 (- 1)]
       (let [(ok err2) (coroutine.resume (. handler-coros i))]
@@ -109,17 +106,17 @@
           (when (not ok) (print "  | Handler error" err2))
           (table.remove handler-coros i))))
     (if s
-        (receive conn (.. (or ?part "") s))
+        (receive handler-coros conn (.. (or ?part "") s))
         (and (= err :timeout) (= ?part nil))
         (do
           (coroutine.yield)
-          (receive conn))
+          (receive handler-coros conn))
         (= err :timeout)
         ?part
         (values nil err))))
 
-(λ client-loop [conn ?part]
-  (case (receive conn ?part)
+(λ client-loop [sessions handler-coros conn ?part]
+  (case (receive handler-coros conn ?part)
     input (let [(decoded d-err) (bencode.decode input)]
             (if (and decoded (< d-err (length input)))
                 (set-forcibly! ?part (input:sub (+ d-err 1)))
@@ -132,45 +129,45 @@
                   (error :closed))
                 (and decoded (not= decoded.op :close))
                 (let [coro (coroutine.create handle)]
-                  (let [(ok err) (coroutine.resume coro conn decoded)]
+                  (let [(ok err) (coroutine.resume coro sessions conn decoded)]
                     (when (not ok) (print "  | Handler error" err)))
                   (when (= (coroutine.status coro) :suspended)
                     (table.insert handler-coros coro)))
                 (print "  | Decoding error:" d-err))
-            (client-loop conn ?part))
+            (client-loop sessions handler-coros conn ?part))
     (_ err) (values nil err)))
 
-(λ accept [conn timeout connections]
-  (conn:settimeout timeout)
-  (table.insert connections
-                (coroutine.create #(case (pcall client-loop conn)
-                                     (_ :closed) nil
-                                     (_ err) (print "Connection closed" err)))))
+(λ accept [state conn]
+  (conn:settimeout state.timeout)
+  (tset state.connections conn
+        (coroutine.create #(case (pcall client-loop state.sessions
+                                        state.handler-coros conn)
+                             (_ :closed) nil
+                             (_ err) (print "Connection closed" err)))))
 
-(λ loop [server timeout connections]
+(λ loop [{: server : connections : timeout &as state}]
   (socket.sleep timeout)
   (case (server:accept)
-    conn (do (accept conn timeout connections)
-             (loop server timeout connections))
+    conn (do (accept state conn)
+             (loop state))
     (_ err) (do
               (when (not= err :timeout) (print (.. "  | Socket error: " err)))
-              (each [_ c (ipairs connections)]
-                (coroutine.resume c))
+              (each [conn c (pairs connections)]
+                (case (coroutine.resume c)
+                  false (tset connections conn nil)))
               (if (= err :closed)
                   (do
                     (server:close)
                     (print "Server stopped."))
-                  (loop server timeout connections)))))
+                  (loop state)))))
 
-(λ start [?port]
-  (let [port (or ?port 7888)
-        timeout 0.01
+(λ start [options]
+  (let [port (or options.port 7888)
         server (assert (socket.bind "localhost" port))
-        connections {}]
-    (server:settimeout timeout)
+        state {: server : options :connections {} :handler-coros {} :sessions {}
+               :timeout (or options.timeout 0.01)}]
+    (server:settimeout state.timeout)
     (print (.. "Server started on port " port "..."))
-    (loop server timeout connections)))
+    (loop state)))
 
-{: start
- :stop (fn [coro] (coroutine.resume coro :stop))
- : version}
+{: start : version}
