@@ -1,6 +1,6 @@
 # JeeJah
 
-An nREPL server for [Fennel](https://fennel-lang.org) and [Lua](https://lua.org).
+An nREPL server for [Fennel](https://fennel-lang.org).
 
 **Notice**: this project is looking for a new maintainer.
 
@@ -33,8 +33,8 @@ don't hold.
 
 ## Installation
 
-The pure-Lua dependencies are included (`bencode`, `serpent`, and
-`fennel`) but you will need to install `luasocket` yourself. If your
+The pure-Lua dependencies are included (`bencode`, and `fennel`)
+but you will need to install `luasocket` yourself. If your
 operating system does not provide it, you can install it using LuaRocks:
 
     $ luarocks install --local luasocket
@@ -42,63 +42,17 @@ operating system does not provide it, you can install it using LuaRocks:
 Note that [LÖVE](https://love2d.org) ships with its own copy of
 luasocket, so there is no need to install it there.
 
-You can symlink `bin/jeejah` to your `$PATH` or something.
+Run `make` to create `jeejah` in the checkout; use `make install` to
+put it in `PREFIX`.
 
 ## Usage
 
 You can launch a standalone nREPL server:
 
-    $ bin/jeejah
-
-Pass in a `--fennel` flag to start a server for evaluating Fennel code
-instead of Lua. Accepts a `--port` argument and a `--debug` flag.
-
-You can use it as a library too, of course:
-
-```lua
-local jeejah = require("jeejah")
-local coro = jeejah.start(port, {debug=true, sandbox={x=12}})
-```
-
-The `start` function takes a `port` argument as well as an `options`
-table. The `opts` table takes a few options:
-
-* `debug`: Log more.
-* `foreground`: Leave the server running in the foreground and skip the
-  step of resuming the coroutine.
-* `timeout`: Override the default timeout (in seconds).
-* `fennel`: Evaluate code as fennel.
-* `serializer`: Replace `serpent.block` with the provided function to
-  serialize objects to string.
-
-The function returns a coroutine which you'll need to repeatedly
-resume in order to handle requests. Each accepted connection is stored
-in a coroutine internal to that function; these are each repeatedly
-resumed by the main coroutine.
-
-Note that the sandbox feature is not well-tested or audited and should
-not be trusted to provide robust security. It currently only works
-with Lua 5.1 and LuaJIT.
-
-You can also pass in a `handlers` table where the keys are custom
-[nREPL ops](https://nrepl.org/nrepl/ops.html)
-you want to handle yourself.
-
-## Completion
-
-The included `monroe-lua-complete.el` file adds support for completion
-to the Monroe client by querying the connected nREPL server for
-possibilities. Simply invoke `completion-at-point` (bound to `C-M-i`
-by default) when connected.
-
-## Caveats
-
-PUC Lua 5.1 does not allow yielding coroutines from inside protected
-calls, which means you cannot use `io.read`, though LuaJIT and
-Lua 5.2+ allow it.
+    $ ./jeejah $PORT
 
 ## License
 
-Copyright © 2016-2020 Phil Hagelberg and contributors
+Copyright © 2016-2025 Phil Hagelberg and contributors
 
 Distributed under the MIT license; see file LICENSE

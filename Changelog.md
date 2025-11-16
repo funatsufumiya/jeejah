@@ -1,5 +1,10 @@
 # Jeejah changelog: history of user-visible changes
 
+## 0.4.0 / ???
+
+* Port to Fennel; drop Lua support.
+* Remove support for middleware, custom handlers, and sandboxing.
+
 ## 0.3.1 / 2020-04-24
 
 * Fix compatibility for Lua 5.1 and 5.2.
