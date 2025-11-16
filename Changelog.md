@@ -3,7 +3,7 @@
 ## 0.4.0 / ???
 
 * Port to Fennel; drop Lua support.
-* Remove support for middleware, custom handlers, and sandboxing.
+* Remove support for middleware and custom handlers.
 
 ## 0.3.1 / 2020-04-24
 

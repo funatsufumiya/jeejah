@@ -32,9 +32,12 @@
 
     (fn options.onValues [xs]
       (d :!values (fennel.view xs))
-      ;; the spec implies you can combine these, but monroe disagrees
-      (send session.conn session.msg {:value (table.concat xs "\t")})
-      (send session.conn session.msg {:status [:done]}))
+      (if session.values-override ; completion intercepts this
+          (session.values-override xs)
+          (doto session.conn
+            ;; the spec implies you can combine these, but monroe disagrees
+            (send session.msg {:value (table.concat xs "\t")})
+            (send session.msg {:status [:done]}))))
 
     (fn options.onError [errtype msg]
       (d :!err errtype msg (fennel.view session.msg))
@@ -71,10 +74,23 @@
              :ls-sessions :stdin :interrupt]]
     {: ops :status [:done] :server-name "jeejah" :server-version version}))
 
+(λ completions [session conn msg]
+  (var targets nil)
+  (fn session.values-override [completion-targets]
+    (set targets completion-targets))
+  (session.repl (string.format ",complete %s\n" msg.prefix))
+  (set session.values-override nil)
+  (d :!completion msg.prefix :-> (fennel.view targets))
+  (send conn msg {:completions (icollect [_ t (ipairs targets)]
+                                 {:candidate t :type "unknown"})
+                  :status [:done]}))
+
 (λ session-for [sessions options conn msg]
   ;; the fallback register-session here shouldn't be necessary, but let's
   ;; just be tolerant in case there are client bugs
-  (doto (or (. sessions msg.session) (register-session sessions options conn))
+  (doto (or (. sessions msg.session)
+            (do (print "  | Warning: implicit session registration")
+                (register-session sessions options conn)))
     (tset :msg msg)))
 
 (λ handle [sessions options conn msg]
@@ -82,6 +98,8 @@
   (case msg
     {:op :clone} (send conn msg (register-session sessions options conn))
     {:op :describe} (send conn msg (describe))
+    {:op :completions} (completions (session-for sessions options conn msg)
+                                    conn msg)
     {:op :ls-sessions} (send conn msg
                              {:sessions (icollect [_ {: id} (ipairs sessions)]
                                           id)
