@@ -70,8 +70,8 @@
     {:new-session id :status [:done]}))
 
 (λ describe []
-  (let [ops [:clone :close :describe :eval :load-file :lookup
-             :ls-sessions :stdin :interrupt]]
+  (let [ops [:clone :close :describe :completions :eval :load-file ; :lookup
+             :ls-sessions :stdin]]
     {: ops :status [:done] :server-name "jeejah" :server-version version}))
 
 (λ completions [session conn msg]
@@ -110,6 +110,10 @@
     {:op :stdin} (let [session (session-for sessions options conn msg)]
                    (session.repl msg.stdin)
                    (send conn msg {:status [:done]}))
+    {:op :load-file} (case (pcall fennel.dofile msg.file)
+                       true (send conn msg {:status [:done]})
+                       (_ err) (send conn msg {:ex err :status [:done]}))
+    ;; {:op :lookup} :TODO
     {:op :interrupt} nil
     _ (do
         (send conn msg {:status [:unknown-op]})
