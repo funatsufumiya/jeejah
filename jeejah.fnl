@@ -57,6 +57,7 @@
       (send session.conn session.msg {:status [:need-input]})
       (d :!need-input)
       (coroutine.yield))
+    (set options.useMetadata true)
     (coroutine.wrap #(fennel.repl options))))
 
 (λ register-session [sessions options conn]
@@ -69,7 +70,7 @@
     {:new-session id :status [:done]}))
 
 (λ describe []
-  (let [ops [:clone :close :describe :completions :eval :load-file ; :lookup
+  (let [ops [:clone :close :describe :completions :eval :load-file :lookup
              :ls-sessions :stdin]]
     {: ops :status [:done]
      :server-name "jeejah" :server-version version}))
@@ -84,6 +85,21 @@
   (send conn msg {:completions (icollect [_ t (ipairs targets)]
                                  {:candidate t :type "unknown"})
                   :status [:done]}))
+
+(λ lookup [session msg]
+  (let [info {}]
+    (fn session.values-override [[location]]
+      (when (not (location:find "^Repl error:"))
+        (set [info.file info.line] [(location:match "^(.*):(%d)")])))
+    (session.repl (string.format ",find %s\n" msg.sym))
+    (fn session.values-override [[doc]]
+      (when (not (doc:find "not found$"))
+        (set [info.arglist info.doc] [(doc:match "^(.*)\n(.*)")])))
+    (session.repl (string.format ",doc %s\n" msg.sym))
+    (set session.values-override nil)
+    (if (next info)
+        (send session.conn msg {: info :status [:done]})
+        (send session.conn msg {:status [:done]}))))
 
 (λ session-for [sessions options conn msg]
   ;; the fallback register-session here shouldn't be necessary, but let's
@@ -110,10 +126,10 @@
     {:op :stdin} (let [session (session-for sessions options conn msg)]
                    (session.repl msg.stdin)
                    (send conn msg {:status [:done]}))
-    {:op :load-file} (case (pcall fennel.dofile msg.file)
+    {:op :load-file} (case (pcall fennel.dofile msg.file {:useMetadata true})
                        true (send conn msg {:status [:done]})
                        (_ err) (send conn msg {:ex err :status [:done]}))
-    ;; {:op :lookup} :TODO
+    {:op :lookup} (lookup (session-for sessions options conn msg) msg)
     {:op :interrupt} nil
     _ (do
         (send conn msg {:status [:unknown-op :done]})
