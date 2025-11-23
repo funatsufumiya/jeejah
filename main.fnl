@@ -7,4 +7,6 @@
   "--help" (print help)
   n (case (tonumber n)
       port (jeejah.start {: port})
-      _ (do (print help) (os.exit 1))))
+      _ (do (print help) (os.exit 1)))
+  _ (do (print "usage: jeejah PORT")
+        (os.exit 1)))

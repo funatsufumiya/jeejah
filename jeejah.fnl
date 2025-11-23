@@ -54,10 +54,9 @@
     (set env.io {: write})
     (set env.print repl-print)
     (fn env.io.read []
-      (session.needinput)
-      (let [(input done) (coroutine.yield)]
-        (done)
-        input))
+      (send session.conn session.msg {:status [:need-input]})
+      (d :!need-input)
+      (coroutine.yield))
     (coroutine.wrap #(fennel.repl options))))
 
 (λ register-session [sessions options conn]
@@ -72,7 +71,8 @@
 (λ describe []
   (let [ops [:clone :close :describe :completions :eval :load-file ; :lookup
              :ls-sessions :stdin]]
-    {: ops :status [:done] :server-name "jeejah" :server-version version}))
+    {: ops :status [:done]
+     :server-name "jeejah" :server-version version}))
 
 (λ completions [session conn msg]
   (var targets nil)
@@ -116,7 +116,7 @@
     ;; {:op :lookup} :TODO
     {:op :interrupt} nil
     _ (do
-        (send conn msg {:status [:unknown-op]})
+        (send conn msg {:status [:unknown-op :done]})
         (print "  | Unknown op" (fennel.view msg)))))
 
 (λ receive [handler-coros conn ?part]
@@ -146,7 +146,8 @@
 (λ client-loop [{: sessions : handler-coros : options &as state} conn ?part]
   (case (receive handler-coros conn ?part)
     input (case (bencode.decode input)
-            {:op :close} (cleanup state conn :closed)
+            {:op :close &as msg} (do (send conn msg {:status [:done]})
+                                     (cleanup state conn :closed))
             (decoded len) (let [coro (coroutine.create handle)
                                 (ok err) (coroutine.resume coro sessions options
                                                            conn decoded)
@@ -180,7 +181,6 @@
           _ (print "  | Unrecognized connection" ready))))
   (loop state))
 
-;; TODO: middleware API?
 (λ start [options]
   (let [port (or options.port 7888)
         server (assert (socket.bind "localhost" port))
