@@ -71,13 +71,20 @@
     (set session.repl (make-repl session options))
     ; (print session.repl)
     (session.repl)
+    (print (.. "new-session: " id))
     {:new-session id :status [:done]}))
 
 (λ describe []
   (let [ops [:clone :close :describe :completions :eval :load-file :lookup
              :ls-sessions :stdin]]
-    {: ops :status [:done]
-     :server-name "jeejah" :server-version version}))
+    (let [v {: ops :status [:done]
+      :server-name "jeejah" :server-version version
+      :aux {:current-ns "user"}
+      ; :middleware "fennel"
+      }]
+     (pt.printTable v)
+     (print "\n")
+     v)))
 
 (λ completions [session conn msg]
   (var targets nil)
@@ -127,8 +134,11 @@
 (λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
   (pt.printTable msg)
+  (print "\n")
   (case msg
-    {:op :clone} (send conn msg (register-session sessions options conn))
+    {:op :clone} (do
+      (print (.. "[clone] client-name: " msg.client-name ", client-version: " msg.client-version))
+      (send conn msg (register-session sessions options conn)))
     {:op :describe} (send conn msg (describe))
     {:op :completions} (completions (session-for sessions options conn msg)
                                     conn msg)
