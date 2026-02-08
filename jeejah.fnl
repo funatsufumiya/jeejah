@@ -198,7 +198,7 @@
                             (when (not ok) (do
                               (print "  | Handler error" err)
                               (send conn {:session last-session.id :id last-msg.id}
-                                {:session last-msg.id :value "error"})
+                                {:session last-msg.id :value (.. "error: " err)})
                               (send conn {:session last-session.id :id last-msg.id} {:status [:done]})
                               ))
                             (when (= (coroutine.status coro) :suspended)
