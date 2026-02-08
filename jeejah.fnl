@@ -5,6 +5,8 @@
 (local d (if (os.getenv "DEBUG") print #nil))
 
 (local version "0.4.0-dev")
+(var last-msg nil)
+(var last-session nil)
 
 (λ send [conn from msg]
   (set (msg.session msg.id msg.ns) (values from.session from.id ">"))
@@ -139,12 +141,13 @@
                   (d :!evaluating msg.code)
                   ; (print sessions)
                   ; (print repl)
+                  (set last-session session)
+                  (set last-msg msg)
                   (let [val (fennel.eval (.. msg.code "\n"))]
-                    (print val)
+                    ; (print val)
                     (send conn {:session session.id :id msg.id}
                       {:session msg.id :value val})
-                    (send conn {:session session.id :id msg.id} {:status [:done]})
-                    ))
+                    (send conn {:session session.id :id msg.id} {:status [:done]})))
     {:op :stdin} (let [session (session-for sessions options conn msg)]
                    (session.repl msg.stdin)
                    (send conn msg {:status [:done]}))
@@ -192,7 +195,12 @@
                                 part (if (< len (length input))
                                          (input:sub (+ len 1))
                                          nil)]
-                            (when (not ok) (print "  | Handler error" err))
+                            (when (not ok) (do
+                              (print "  | Handler error" err)
+                              (send conn {:session last-session.id :id last-msg.id}
+                                {:session last-msg.id :value "error"})
+                              (send conn {:session last-session.id :id last-msg.id} {:status [:done]})
+                              ))
                             (when (= (coroutine.status coro) :suspended)
                               (table.insert handler-coros coro))
                             (client-loop state conn part))
