@@ -3,3 +3,6 @@
 rockspecs/*asc
 /jeejah
 /scratch.fnl
+/.lsp
+/.clj-kondo
+/.calva
