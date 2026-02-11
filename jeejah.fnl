@@ -3,6 +3,9 @@
 (local bencode (require :bencode))
 (local pt (require :printTable))
 (local d (if (os.getenv "DEBUG") print #nil))
+(local dp (if (os.getenv "DEBUG") pt.printTable #nil))
+(if (os.getenv "DEBUG")
+  (print "debug: on"))
 
 (local version "0.4.0-dev")
 
@@ -123,7 +126,6 @@
 
 (λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
-  (pt.printTable msg)
   (case msg
     {:op :clone} (send conn msg (register-session sessions options conn))
     {:op :describe} (send conn msg (describe))
@@ -134,7 +136,6 @@
                                           id)
                               :status [:done]})
     {:op :eval} (let [{: repl} (session-for sessions options conn msg)]
-                  ; (print msg)
                   (d :!evaluating msg.code)
                   (repl (.. msg.code "\n")))
     {:op :stdin} (let [session (session-for sessions options conn msg)]
