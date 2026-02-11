@@ -47,6 +47,7 @@
       (send session.conn session.msg {:status [:done]}))
 
     (fn options.readChunk []
+      (d "[repl] reading chunk")
       (let [input (coroutine.yield)]
         (if (input:find "^%s*$")
             "nil\n" ; If we skip empty input, it confuses the client.
@@ -60,6 +61,7 @@
       (d :!need-input)
       (coroutine.yield))
     (set options.useMetadata true)
+    (d (.. "repl created for " session.id))
     (coroutine.wrap #(fennel.repl options))))
 
 (λ register-session [sessions options conn]
