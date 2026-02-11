@@ -1,7 +1,6 @@
 (local fennel (require :fennel))
 (local socket (require :socket))
 (local bencode (require :bencode))
-(local pt (require :printTable))
 (local d (if (os.getenv "DEBUG") print #nil))
 
 (local version "0.4.0-dev")
@@ -82,8 +81,7 @@
       :aux {:current-ns "user"}
       ; :middleware "fennel"
       }]
-     (pt.printTable v)
-     (print "\n")
+     (d (fennel.view v))
      v)))
 
 (λ completions [session conn msg]
@@ -133,8 +131,6 @@
 
 (λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
-  (pt.printTable msg)
-  (print "\n")
   (case msg
     {:op :clone} (do
       (print (.. "[clone] client-name: " msg.client-name ", client-version: " msg.client-version))
