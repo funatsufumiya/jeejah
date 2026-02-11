@@ -119,7 +119,8 @@
                         (register-session sessions options conn)))]
     (tset session :msg msg)
     (when (= nil session.repl)
-      (set session.repl (make-repl session options)))
+      (set session.repl (make-repl session options))
+      (session.repl))
     session))
 
 (λ handle [sessions options conn msg]
