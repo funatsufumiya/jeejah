@@ -1,9 +1,7 @@
 (local fennel (require :fennel))
 (local socket (require :socket))
 (local bencode (require :bencode))
-(local pt (require :printTable))
 (local d (if (os.getenv "DEBUG") print #nil))
-(local dp (if (os.getenv "DEBUG") pt.printTable #nil))
 (if (os.getenv "DEBUG")
   (print "debug: on"))
 
