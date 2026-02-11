@@ -26,6 +26,7 @@
       nil)))
 
 (λ make-repl [session options]
+  (assert session)
   (let [write (write-for session)
         repl-print (print-for session)
         env (or options.env {})]
