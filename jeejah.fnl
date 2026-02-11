@@ -1,6 +1,7 @@
 (local fennel (require :fennel))
 (local socket (require :socket))
 (local bencode (require :bencode))
+(local pt (require :printTable))
 (local d (if (os.getenv "DEBUG") print #nil))
 
 (local version "0.4.0-dev")
@@ -101,16 +102,28 @@
         (send session.conn msg {: info :status [:done]})
         (send session.conn msg {:status [:done]}))))
 
-(λ session-for [sessions options conn msg]
+; (λ session-for [sessions options conn msg]
+;   ;; the fallback register-session here shouldn't be necessary, but let's
+;   ;; just be tolerant in case there are client bugs
+;   (doto (or (. sessions msg.session)
+;             (do (print "  | Warning: implicit session registration")
+;                 (register-session sessions options conn)))
+;     (tset :msg msg)))
+
+ (λ session-for [sessions options conn msg]
   ;; the fallback register-session here shouldn't be necessary, but let's
   ;; just be tolerant in case there are client bugs
-  (doto (or (. sessions msg.session)
-            (do (print "  | Warning: implicit session registration")
-                (register-session sessions options conn)))
-    (tset :msg msg)))
+  (let [session (or (. sessions msg.session)
+                    (do (print "  | Warning: implicit session registration")
+                        (register-session sessions options conn)))]
+    (tset session :msg msg)
+    (when (= nil session.repl)
+      (set session.repl (make-repl session options)))
+    session))
 
 (λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
+  (pt.printTable msg)
   (case msg
     {:op :clone} (send conn msg (register-session sessions options conn))
     {:op :describe} (send conn msg (describe))
@@ -121,6 +134,7 @@
                                           id)
                               :status [:done]})
     {:op :eval} (let [{: repl} (session-for sessions options conn msg)]
+                  ; (print msg)
                   (d :!evaluating msg.code)
                   (repl (.. msg.code "\n")))
     {:op :stdin} (let [session (session-for sessions options conn msg)]
