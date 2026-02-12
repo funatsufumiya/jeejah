@@ -80,8 +80,12 @@
     session))
 
 (λ describe []
-  (let [ops [:clone :close :describe :completions :eval :load-file :lookup
-             :ls-sessions :stdin]]
+  ; (let [ops [:clone :close :describe :completions :eval :load-file :lookup
+  ;            :ls-sessions :stdin]]
+  (let [ops-lst [:clone :close :describe :completions :eval :load-file :lookup
+             :ls-sessions :stdin]
+        ops (collect [_ s (ipairs ops-lst)] s {})
+             ]
     {: ops :status [:done]
      :versions
       {:nrepl {:major 0 :minor 2 :inremental 7 :version-string "0.2.7"}
