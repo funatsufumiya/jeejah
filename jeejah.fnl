@@ -8,6 +8,7 @@
 (local version "0.4.0-dev")
 
 (λ send [conn from msg]
+  ; (d (.. "send from " (fennel.view from)))
   (set (msg.session msg.id msg.ns) (values from.session from.id ">"))
   (d ">" (fennel.view msg))
   (conn:send (bencode.encode msg)))
@@ -35,14 +36,16 @@
 
     (fn options.onValues [xs]
       (d :!values (fennel.view xs))
-      (if session.values-override ; completion intercepts this
-          (session.values-override xs)
-          (doto session.conn
-            ;; the spec implies you can combine these, but monroe disagrees
-            (send session.msg {:value (table.concat xs "\t")})
-            (send session.msg {:status [:done]}))))
+      ; (if session.values-override ; completion intercepts this
+      ;     (session.values-override xs)
+      ;     (doto session.conn
+      ;       ;; the spec implies you can combine these, but monroe disagrees
+      ;       ; (d (.. "onValues from" (fennel.view session)))
+      (send session.conn session.msg {:value (table.concat xs "\t")})
+      (send session.conn session.msg {:status [:done]}))
 
     (fn options.onError [errtype msg]
+      ; (d (.. "onError from" (fennel.view session)))
       (d :!err errtype msg (fennel.view session.msg))
       (send session.conn session.msg {:ex errtype :err (.. msg "\n")})
       (send session.conn session.msg {:status [:done]}))
@@ -62,6 +65,7 @@
       (d :!need-input)
       (coroutine.yield))
     (set options.useMetadata true)
+    (d "repl created!")
     (d (.. "repl created for " session.id))
     (coroutine.wrap #(fennel.repl options))))
 
@@ -70,9 +74,10 @@
         session {: conn : id}]
     (d :!register id)
     (tset sessions id session)
-    (set session.repl (make-repl session options))
-    (session.repl)
-    {:new-session id :status [:done]}))
+    (when (= nil session.repl)
+      (set session.repl (make-repl session options))
+      (session.repl))
+    session))
 
 (λ describe []
   (let [ops [:clone :close :describe :completions :eval :load-file :lookup
@@ -117,6 +122,7 @@
  (λ session-for [sessions options conn msg]
   ;; the fallback register-session here shouldn't be necessary, but let's
   ;; just be tolerant in case there are client bugs
+  (d (.. "session-for" (fennel.view msg)))
   (let [session (or (. sessions msg.session)
                     (do (print "  | Warning: implicit session registration")
                         (register-session sessions options conn)))]
@@ -129,7 +135,8 @@
 (λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
   (case msg
-    {:op :clone} (send conn msg (register-session sessions options conn))
+    {:op :clone} (let [session (register-session sessions options conn)]
+      (send conn msg {:new-session session.id :status [:done]}))
     {:op :describe} (send conn msg (describe))
     {:op :completions} (completions (session-for sessions options conn msg)
                                     conn msg)
