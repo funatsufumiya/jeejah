@@ -83,7 +83,12 @@
   (let [ops [:clone :close :describe :completions :eval :load-file :lookup
              :ls-sessions :stdin]]
     {: ops :status [:done]
-     :server-name "jeejah" :server-version version}))
+     :versions
+      {:nrepl {:major 0 :minor 2 :inremental 7 :version-string "0.2.7"}
+       :java {:major 0 :minor 0 :inremental 0 :version-string "0.0.0"}
+       :clojure {:major 0 :minor 0 :inremental 0 :version-string "0.0.0"}}
+     :server-name "jeejah" :server-version version
+     }))
 
 (λ completions [session conn msg]
   (var targets nil)
