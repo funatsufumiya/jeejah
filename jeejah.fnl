@@ -2,13 +2,14 @@
 (local socket (require :socket))
 (local bencode (require :bencode))
 (local d (if (os.getenv "DEBUG") print #nil))
+(if (os.getenv "DEBUG")
+  (print "debug: on"))
 
 (local version "0.4.0-dev")
-(var last-msg nil)
-(var last-session nil)
 
 (λ send [conn from msg]
-  (set (msg.session msg.id msg.ns) (values from.session from.id ">"))
+  ; (d (.. "send from " (fennel.view from)))
+  (set (msg.session msg.id msg.ns) (values from.session from.id "user"))
   (d ">" (fennel.view msg))
   (conn:send (bencode.encode msg)))
 
@@ -26,6 +27,7 @@
       nil)))
 
 (λ make-repl [session options]
+  (assert session)
   (let [write (write-for session)
         repl-print (print-for session)
         env (or options.env {})]
@@ -34,19 +36,22 @@
 
     (fn options.onValues [xs]
       (d :!values (fennel.view xs))
-      (if session.values-override ; completion intercepts this
-          (session.values-override xs)
-          (doto session.conn
-            ;; the spec implies you can combine these, but monroe disagrees
-            (send session.msg {:value (table.concat xs "\t")})
-            (send session.msg {:status [:done]}))))
+      ; (if session.values-override ; completion intercepts this
+      ;     (session.values-override xs)
+      ;     (doto session.conn
+      ;       ;; the spec implies you can combine these, but monroe disagrees
+      ;       ; (d (.. "onValues from" (fennel.view session)))
+      (send session.conn session.msg {:value (table.concat xs "\t")})
+      (send session.conn session.msg {:status [:done]}))
 
     (fn options.onError [errtype msg]
+      ; (d (.. "onError from" (fennel.view session)))
       (d :!err errtype msg (fennel.view session.msg))
       (send session.conn session.msg {:ex errtype :err (.. msg "\n")})
       (send session.conn session.msg {:status [:done]}))
 
     (fn options.readChunk []
+      ; (d "[repl] reading chunk")
       (let [input (coroutine.yield)]
         (if (input:find "^%s*$")
             "nil\n" ; If we skip empty input, it confuses the client.
@@ -60,6 +65,8 @@
       (d :!need-input)
       (coroutine.yield))
     (set options.useMetadata true)
+    ; (d "repl created!")
+    (d (.. "repl created for " session.id))
     (coroutine.wrap #(fennel.repl options))))
 
 (λ register-session [sessions options conn]
@@ -67,22 +74,25 @@
         session {: conn : id}]
     (d :!register id)
     (tset sessions id session)
-    (set session.repl (make-repl session options))
-    ; (print session.repl)
-    (session.repl)
-    (print (.. "new-session: " id))
-    {:new-session id :status [:done]}))
+    (when (= nil session.repl)
+      (set session.repl (make-repl session options))
+      (session.repl))
+    session))
 
 (λ describe []
-  (let [ops [:clone :close :describe :completions :eval :load-file :lookup
-             :ls-sessions :stdin]]
-    (let [v {: ops :status [:done]
-      :server-name "jeejah" :server-version version
-      :aux {:current-ns "user"}
-      ; :middleware "fennel"
-      }]
-     (d (fennel.view v))
-     v)))
+  ; (let [ops [:clone :close :describe :completions :eval :load-file :lookup
+  ;            :ls-sessions :stdin]]
+  (let [ops-lst [:clone :close :describe :completions :eval :load-file :lookup
+             :ls-sessions :stdin]
+        ops (collect [_ s (ipairs ops-lst)] s {})
+             ]
+    {: ops :status [:done]
+     :versions
+      {:nrepl {:major 0 :minor 2 :inremental 7 :version-string "0.2.7"}
+       :java {:major 0 :minor 0 :inremental 0 :version-string "0.0.0"}
+       :clojure {:major 0 :minor 0 :inremental 0 :version-string "0.0.0"}}
+     :server-name "jeejah" :server-version version
+     }))
 
 (λ completions [session conn msg]
   (var targets nil)
@@ -118,23 +128,24 @@
 ;                 (register-session sessions options conn)))
 ;     (tset :msg msg)))
 
-(λ session-for [sessions options conn msg]
-   ;; the fallback register-session here shouldn't be necessary, but let's
-   ;; just be tolerant in case there are client bugs
+ (λ session-for [sessions options conn msg]
+  ;; the fallback register-session here shouldn't be necessary, but let's
+  ;; just be tolerant in case there are client bugs
+  (d (.. "session-for " (fennel.view msg)))
   (let [session (or (. sessions msg.session)
                     (do (print "  | Warning: implicit session registration")
                         (register-session sessions options conn)))]
     (tset session :msg msg)
     (when (= nil session.repl)
-      (set session.repl (make-repl session options)))
+      (set session.repl (make-repl session options))
+      (session.repl))
     session))
 
 (λ handle [sessions options conn msg]
   (d "<" (fennel.view msg))
   (case msg
-    {:op :clone} (do
-      (print (.. "[clone] client-name: " msg.client-name ", client-version: " msg.client-version))
-      (send conn msg (register-session sessions options conn)))
+    {:op :clone} (let [session (register-session sessions options conn)]
+      (send conn msg {:new-session session.id :status [:done]}))
     {:op :describe} (send conn msg (describe))
     {:op :completions} (completions (session-for sessions options conn msg)
                                     conn msg)
@@ -142,18 +153,9 @@
                              {:sessions (icollect [_ {: id} (ipairs sessions)]
                                           id)
                               :status [:done]})
-    {:op :eval} (let [session (session-for sessions options conn msg)
-                      {: repl} session]
+    {:op :eval} (let [{: repl} (session-for sessions options conn msg)]
                   (d :!evaluating msg.code)
-                  ; (print sessions)
-                  ; (print repl)
-                  (set last-session session)
-                  (set last-msg msg)
-                  (let [val (fennel.eval (.. msg.code "\n"))]
-                    ; (print val)
-                    (send conn {:session session.id :id msg.id}
-                      {:session msg.id :value val})
-                    (send conn {:session session.id :id msg.id} {:status [:done]})))
+                  (repl (.. msg.code "\n")))
     {:op :stdin} (let [session (session-for sessions options conn msg)]
                    (session.repl msg.stdin)
                    (send conn msg {:status [:done]}))
@@ -201,12 +203,7 @@
                                 part (if (< len (length input))
                                          (input:sub (+ len 1))
                                          nil)]
-                            (when (not ok) (do
-                              (print "  | Handler error" err)
-                              (send conn {:session last-session.id :id last-msg.id}
-                                {:session last-msg.id :value (.. "error: " err)})
-                              (send conn {:session last-session.id :id last-msg.id} {:status [:done]})
-                              ))
+                            (when (not ok) (print "  | Handler error" err))
                             (when (= (coroutine.status coro) :suspended)
                               (table.insert handler-coros coro))
                             (client-loop state conn part))
