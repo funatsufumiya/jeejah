@@ -9,7 +9,7 @@
 
 (λ send [conn from msg]
   ; (d (.. "send from " (fennel.view from)))
-  (set (msg.session msg.id msg.ns) (values from.session from.id ">"))
+  (set (msg.session msg.id msg.ns) (values from.session from.id "user"))
   (d ">" (fennel.view msg))
   (conn:send (bencode.encode msg)))
 
@@ -51,7 +51,7 @@
       (send session.conn session.msg {:status [:done]}))
 
     (fn options.readChunk []
-      (d "[repl] reading chunk")
+      ; (d "[repl] reading chunk")
       (let [input (coroutine.yield)]
         (if (input:find "^%s*$")
             "nil\n" ; If we skip empty input, it confuses the client.
@@ -65,7 +65,7 @@
       (d :!need-input)
       (coroutine.yield))
     (set options.useMetadata true)
-    (d "repl created!")
+    ; (d "repl created!")
     (d (.. "repl created for " session.id))
     (coroutine.wrap #(fennel.repl options))))
 
@@ -122,7 +122,7 @@
  (λ session-for [sessions options conn msg]
   ;; the fallback register-session here shouldn't be necessary, but let's
   ;; just be tolerant in case there are client bugs
-  (d (.. "session-for" (fennel.view msg)))
+  (d (.. "session-for " (fennel.view msg)))
   (let [session (or (. sessions msg.session)
                     (do (print "  | Warning: implicit session registration")
                         (register-session sessions options conn)))]
